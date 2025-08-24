@@ -1,0 +1,855 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset='utf-8'>
+  <title>Sector Analysis - Impacts of supply chain</title>
+  <link rel="shortcut icon" href="data:image/x-icon;," type="image/x-icon">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <link href="https://unpkg.com/tabulator-tables@5.2.7/dist/css/tabulator.min.css" rel="stylesheet">
+  <script type="text/javascript" src="https://unpkg.com/tabulator-tables@5.2.7/dist/js/tabulator.min.js"></script>
+
+  <!-- The id here prevents the older file from loading -->
+  <script type="text/javascript" srcX="../../localsite/js/d3.v5.min.js" id="/localsite/js/d3.v5.min.js"></script>
+  <script type="text/javascript" srcX="../../localsite/js/jquery.min.js" id="/localsite/js/jquery.min.js"></script>
+
+  <!-- instead we use newer files -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+
+
+  <script type="text/javascript" src="../../localsite/js/localsite.js?showheader=true&showsearch=true"></script>
+  <script src="../dist/useeio.js"></script>
+  <style>
+    #table {
+      margin: 20px 0;
+      height: auto !important; /* Override fixed height */
+    }
+    .tabulator-cell {
+      white-space: normal;
+      overflow: visible;
+      padding: 8px;
+    }
+    .tabulator .tabulator-header .tabulator-col {
+      background-color: #f4f4f4;
+    }
+    /* Add these rules to remove empty space */
+    .tabulator-tableholder {
+      height: auto !important;
+      min-height: 0 !important;
+    }
+    .tabulator {
+      height: auto !important;
+    }
+    .controlDD {
+      width: 90px;
+      padding: 4px 8px;
+      font-size: 12px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      background: white; /* covers down arrow */
+    }
+    .dark .controlDD {
+      background: #333;
+    }
+  </style>
+</head>
+
+<body>
+  
+  <!-- D3 Separated chord chart -->
+  <div style="position: relative;">
+    <div id="chart2"></div>
+    <!-- Control Dropdowns -->
+    <div style="position: absolute; top: 10px; right: 10px; z-index: 1000;">
+      <select id="theme-mode" class="controlDD">
+        <option value="light" selected>Light Mode</option>
+        <option value="dark">Dark Mode</option>
+      </select><br>
+      <select id="scaling-method" class="controlDD">
+        <option value="raw" selected>No Scaling</option>
+        <option value="square-root">Square Root</option>
+        <option value="proportional">Proportional</option>
+        <option value="logarithmic">Logarithmic</option>
+      </select><br>
+      <select id="edge-style" class="controlDD">
+        <option value="none">No Edge</option>
+        <option value="light" selected>Light Edge</option>
+        <option value="dark">Dark Edge</option>
+      </select>
+    </div>
+  </div>
+
+  <div style="padding-left:60px;padding-right:18px;">
+    <div id="relocatedStateMenu"></div>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+        <p id="info" style="margin: 0;">Loading ...</p>
+        <select id="number-format-select" style="margin-left: 10px;">
+            <option value="simple" selected>simple</option>
+            <option value="full">full</option>
+            <option value="scientific">scientific</option>
+        </select>
+    </div>
+    <div id="table"></div>
+    <div style="display:block; margin: 10px 0 20px 0;">
+      <a href="#" id="showAllLink">Show all rows</a>  | <a id="footprintLink" href="./" >More State Impact Reports</a>
+    </div>
+  </div>
+  
+  <script src="./config.js"></script>
+  <script type="module">
+    // Importing chord diagram initialization function
+    // chordInit.js loads script.js in same folder.
+    import { initializeChordDiagram } from './chord/stretched/chordInit.js';
+    // Add at the top level of the script, outside any function
+    let isShowingAllRows = false;
+    let table;
+    let currentData = null; // Add this to track current data state
+    let allResults = null; // Add this to store full dataset
+
+    // creating function chartData to store the data for the chord diagram
+    let chartData = {
+        nodes: [],
+        links: []
+    };
+
+    document.addEventListener('hashChangeEvent', hashChangedUseeio, false);
+    function hashChangedUseeio() {
+      console.log("URL hash changed");
+      model = getModel();
+      isShowingAllRows = false;
+      currentData = null;
+      
+      // Reset format to simple when state changes
+      const formatSelect = document.getElementById('number-format-select');
+      formatSelect.value = 'simple';
+      
+      // Reset show all link visibility and state before loading new state
+      const showAllLink = document.getElementById('showAllLink');
+      showAllLink.style.display = 'inline-block';
+      isShowingAllRows = false;
+      
+      main();
+    }
+    async function main() {
+      let hash = getUrlHash();
+      const info = document.getElementById("info");
+      const demandId = await model.findDemand({
+        system: "Complete",
+        type: "Consumption",
+      });
+      if (!demandId) {
+        info.textContent = "Failed to load demand";
+        return;
+      }
+
+      const sectors = await model.sectors();
+      // Use first sector for consistent results instead of random
+      const sector = sectors[0];
+      console.log(`Base analysis sector: ${sector.code} - ${sector.name}`);
+      info.textContent = `Analyzing sector '${sector.name}' based on ${demandId}`;
+
+      const analysis = await useeio.SectorAnalysis.of(model, sector, demandId);
+      const indicators = await model.indicators();
+
+      const total = await analysis.getSupplyChainImpacts(indicators);
+      const byIndicator = {};
+      for (const indicator of indicators) {
+        byIndicator[indicator.code] = await analysis.getSupplyChainImpacts(indicator);
+      }
+      const results = [];
+      console.log(`Processing ${sectors.length} sectors for supply chain impacts`);
+      for (const sectorItem of sectors) {
+          // Store raw values for proper sorting
+          const rawTotal = Math.abs(total[sectorItem.index]);
+          const result = {
+              sector: sectorItem.name, // Just the name without NAICS code
+              total: rawTotal,
+              totalRaw: rawTotal, // Add raw value for sorting
+              sortValue: rawTotal, // Explicit sort value
+              // Additional metadata for popups
+              metadata: {
+                  NAICS: sectorItem.code,
+                  fullName: `${sectorItem.code} - ${sectorItem.name}`,
+                  index: sectorItem.index,
+                  location: sectorItem.location || 'N/A'
+              }
+          };
+          indicators.forEach(i => {
+              const value = byIndicator[i.code][sectorItem.index];
+              result[i.code] = value;
+          });
+          results.push(result);
+      }
+
+      // Sort results by total impact
+      results.sort((a, b) => b.sortValue - a.sortValue);
+
+      // Store all results for later use
+      allResults = results.sort((a, b) => b.sortValue - a.sortValue);
+      // Take top 10 initially
+      const sortedResults = allResults.slice(0, 10);
+
+      // Replace the existing formatNumber function with:
+      function formatNumber(value, formatType) {
+          // Handle true zero or undefined values
+          if (value === 0 || !value) {
+              return '0.0000';
+          }
+          
+          switch(formatType) {
+              case 'simple': {
+                  // Update threshold to 1e-33 for decillionth
+                  if (Math.abs(value) < 1e-33) {
+                      return value.toExponential(4);
+                  }
+                  
+                  const expSimple = value.toExponential();
+                  const [mantissaSimple, exponentSimple] = expSimple.split('e');
+                  const power = parseInt(exponentSimple);
+                  
+                  // Function to convert scientific notation to word form
+                  function getNumberWord(power) {
+                      const words = {
+                          0: '',
+                          3: 'thousand',
+                          6: 'million',
+                          9: 'billion',
+                          12: 'trillion',
+                          15: 'quadrillion',
+                          18: 'quintillion',
+                          21: 'sextillion',
+                          24: 'septillion',
+                          27: 'octillion',
+                          30: 'nonillion',
+                          33: 'decillion',
+                          '-1': 'tenth',
+                          '-2': 'hundredth',
+                          '-3': 'thousandth',
+                          '-6': 'millionth',
+                          '-9': 'billionth',
+                          '-12': 'trillionth',
+                          '-15': 'quadrillionth',
+                          '-18': 'quintillionth',
+                          '-21': 'sextillionth',
+                          '-24': 'septillionth',
+                          '-27': 'octillionth',
+                          '-30': 'nonillionth',
+                          '-33': 'decillionth'
+                      };
+
+                      // Handle numbers with no exponent (e+0) or small positive exponents
+                      if (power >= 0 && power < 3) {
+                          const adjustedValue = parseFloat(mantissaSimple) * Math.pow(10, power);
+                          return adjustedValue.toFixed(4);
+                      }
+
+                      // For extremely small numbers beyond decillionth
+                      if (power < -33) {
+                          return value.toExponential(4);
+                      }
+
+                      // For small numbers, use exact power if available
+                      if (power < 0 && power > -3) {
+                          const word = words[power];
+                          if (word) {
+                              const adjustedMantissa = parseFloat(mantissaSimple) * Math.pow(10, -power);
+                              return `${adjustedMantissa.toFixed(4)} ${word}`;
+                          }
+                      }
+
+                      // For other numbers, use the ceiling of negative power/3 or floor of positive power/3
+                      const absExponent = Math.abs(power);
+                      let nearestPower;
+                      if (power < 0) {
+                          // For negative powers, we need to round up to the next power of 3
+                          nearestPower = Math.ceil(absExponent / 3) * 3;
+                      } else {
+                          // For positive powers, keep using floor
+                          nearestPower = Math.floor(absExponent / 3) * 3;
+                      }
+                      
+                      const word = words[power > 0 ? nearestPower : -nearestPower];
+                      
+                      if (!word) return value.toExponential(4);
+                      
+                      // Adjust mantissa based on difference from nearest power
+                      const powerDiff = nearestPower - absExponent;
+                      const adjustedMantissa = parseFloat(mantissaSimple) * Math.pow(10, powerDiff);
+                      return `${adjustedMantissa.toFixed(4)} ${word}`;
+                  }
+                  
+                  return getNumberWord(power);
+              }
+              case 'full': {
+                  // Lower the threshold for switching to exponential
+                  if (Math.abs(value) < 1e-18) {
+                      return value.toExponential(4);
+                  } else {
+                      return new Intl.NumberFormat('en-US', {
+                          minimumFractionDigits: 4,
+                          maximumFractionDigits: 18 // Increased precision
+                      }).format(value);
+                  }
+              }
+              case 'scientific': {
+                  const expSci = value.toExponential();
+                  const [mantissaSci, exponentSci] = expSci.split('e');
+                  const formattedMantissa = parseFloat(mantissaSci).toFixed(4);
+                  return `${formattedMantissa} × 10<sup>${parseInt(exponentSci)}</sup>`;
+              }
+              default:
+                  return value.toString();
+          }
+      }
+
+      // function to generate chord data
+      // This function creates the data structure for the chord diagram
+      function generatechartData(sectors, indicators, total, byIndicator) {
+          const nodes = [
+              // Add sectors as nodes, i.e. arrays of all elements
+              ...sectors.map(s => ({
+                  id: s.code,
+                  name: s.name,
+                  type: 'sector',
+                  group: 1
+              })),
+              // Add indicators as nodes
+              ...indicators.map(i => ({
+                  id: i.code,
+                  name: i.name || i.code,
+                  type: 'indicator',
+                  group: 2
+              }))
+          ];
+
+          const links = [];
+          sectors.forEach(sector => {
+              indicators.forEach(indicator => {
+                  const value = Math.abs(byIndicator[indicator.code][sector.index]);
+                  if (value > 0) {
+                      links.push({
+                          source: sector.code,
+                          target: indicator.code,
+                          value: value
+                      });
+                  }
+              });
+          });
+
+          return {
+              nodes: nodes,
+              links: links
+          };
+      }
+
+      // Create initial table with sorted data
+      function initializeTable(formatType) {
+          const tableConfig = {
+              data: isShowingAllRows ? allResults : sortedResults,
+              layout: "fitColumns",
+              initialSort: [{column: "total", dir: "desc"}], // Use total for initial sorting
+              columns: [
+                  { 
+                      title: "Sector", 
+                      field: "sector", 
+                      width: 300,
+                      formatter: "html",
+                      headerSortStartingDir: "desc", // Set default sort direction to descending
+                      headerClick: function(e, column) {
+                          if (!isShowingAllRows) {
+                              isShowingAllRows = true;
+                              table.setData(allResults);
+                              showAllLink.style.display = 'none';
+                          }
+                      }
+                  },
+                  { 
+                      title: "Total Score", 
+                      field: "total",
+                      width: 180,
+                      sorter: "number", // Add numeric sorter
+                      formatter: function(cell) {
+                          return formatNumber(cell.getValue(), formatType);
+                      },
+                      headerSortStartingDir: "desc", // Set default sort direction to descending
+                      headerClick: function(e, column) {
+                          if (!isShowingAllRows) {
+                              isShowingAllRows = true;
+                              table.setData(allResults);
+                              showAllLink.style.display = 'none';
+                          }
+                      }
+                  }
+              ]
+          };
+
+          // Modify indicator columns to include descending sort direction
+          indicators.slice(0, 10).forEach(indicator => {
+              tableConfig.columns.push({
+                  title: indicator.code,
+                  field: indicator.code,
+                  width: 160,
+                  sorter: "number", // Add numeric sorter
+                  headerSortStartingDir: "desc", // Set default sort direction to descending
+                  formatter: function(cell) {
+                      return formatNumber(cell.getValue(), formatType);
+                  },
+                  headerClick: function(e, column) {
+                      if (!isShowingAllRows) {
+                          isShowingAllRows = true;
+                          table.setData(allResults);
+                          showAllLink.style.display = 'none';
+                      }
+                  }
+              });
+          });
+
+          return new Tabulator("#table", tableConfig);
+      }
+
+      let isShowingAllRows = false;
+
+      // Initialize table with simple format by default
+      let table = initializeTable('simple');
+      
+      // Set initial data state
+      currentData = sortedResults;
+
+      // Modify the format change listener
+      const formatSelect = document.getElementById('number-format-select');
+      formatSelect.addEventListener('change', function() {
+          const currentFormat = this.value;
+          table.destroy();
+          table = initializeTable(currentFormat);
+          
+          // Always use the correct dataset based on state
+          if (isShowingAllRows) {
+              table.setData(allResults);
+          } else {
+              table.setData(sortedResults);
+          }
+          
+          // Always update link visibility based on state
+          document.getElementById('showAllLink').style.display = 
+              isShowingAllRows ? 'none' : 'inline-block';
+      });
+
+      // Modify the show all link handler
+      const showAllLink = document.getElementById('showAllLink');
+      showAllLink.addEventListener('click', function(e) {
+          e.preventDefault();
+          isShowingAllRows = true;
+          table.setData(allResults);
+          this.style.display = 'none';
+          
+          setTimeout(() => {
+              table.scrollToRow(table.getRows()[table.getRows().length - 1], "bottom", true);
+          }, 100);
+      });
+
+      // Ensure link is visible for new state data
+      showAllLink.style.display = 'inline-block';
+      currentData = sortedResults;
+      isShowingAllRows = false;
+
+      // Updating the main() function to generate chord data
+      chartData = generatechartData(sectors, indicators, total, byIndicator);
+      
+      // Console logging structure for debugging
+      console.log('Chord data generated:', chartData);
+
+      try {
+        // Sort and limit data for consistent chord diagram display
+        console.log(`Total sectors: ${results.length}, limiting to top 10 for chord diagram`);
+        
+        // Ensure results are sorted by total impact (descending)
+        const sortedResults = [...results].sort((a, b) => b.sortValue - a.sortValue);
+        
+        // Debug: Check all sector names before filtering
+        console.log(`All sectors from results (first 15):`, sortedResults.slice(0, 15).map(s => s.sector));
+        
+        // Get unique sectors (avoid duplicate sector names)
+        const uniqueSectors = [];
+        const seenSectors = new Set();
+        
+        for (const result of sortedResults) {
+            if (!seenSectors.has(result.sector) && uniqueSectors.length < 10) {
+                uniqueSectors.push(result);
+                seenSectors.add(result.sector);
+            }
+        }
+        
+        console.log(`Found ${uniqueSectors.length} unique sectors out of ${sortedResults.length} total results`);
+        console.log(`Unique sectors:`, uniqueSectors.map(s => s.sector));
+        console.log(`First few sorted results:`, sortedResults.slice(0, 5).map(s => ({ sector: s.sector, sortValue: s.sortValue.toFixed(3) })));
+        
+        const top10Results = uniqueSectors;
+        
+        // Sort indicators alphabetically for consistent display
+        const sortedIndicators = [...indicators].sort((a, b) => a.code.localeCompare(b.code));
+        console.log(`Total indicators: ${sortedIndicators.length}, limiting to top 10 for chord diagram`);
+        const top10Indicators = sortedIndicators.slice(0, 10);
+        
+        // Store data globally for dropdown changes
+        window.currentChordData = { sectors: top10Results, indicators: top10Indicators };
+        
+        // Load saved preferences for initial chart creation
+        const initialPrefs = window.ChartPreferences ? window.ChartPreferences.load() : { scalingMethod: 'raw', edgeStyle: 'light' };
+        
+        await initializeChordDiagram(top10Results, top10Indicators, { 
+          containerId: '#chart2',
+          scalingMethod: initialPrefs.scalingMethod,
+          chordBorder: {
+            style: initialPrefs.edgeStyle,
+            width: '1px'
+          }
+        });
+        
+        // Display debug info for consistency checking
+        displayDebugInfo(top10Results, top10Indicators);
+      } catch (error) {
+        console.error('Error creating chord diagram:', error);
+      }
+
+    }
+
+    // Debug function to display the sorted lists
+    function displayDebugInfo(sectors, indicators) {
+      const sectorsDiv = document.getElementById('sectors-list');
+      const indicatorsDiv = document.getElementById('indicators-list');
+      
+      // Display sectors list
+      sectorsDiv.innerHTML = `
+        <h5>Top 10 Sectors (sorted by impact, descending):</h5>
+        <ol>
+          ${sectors.map((s, i) => `<li>${s.sector}</li>`).join('')}
+        </ol>
+      `;
+      
+      // Display indicators list
+      indicatorsDiv.innerHTML = `
+        <h5>Indicators (sorted alphabetically by code):</h5>
+        <ol>
+          ${indicators.map(ind => `<li>${ind.code} - ${ind.name || 'No name'}</li>`).join('')}
+        </ol>
+      `;
+      
+      // Display the matrix data (sector-indicator amounts)
+      const matrixDiv = document.createElement('div');
+      
+      // Calculate column totals
+      const columnTotals = indicators.map(ind => {
+        return sectors.reduce((sum, sector) => {
+          const value = sector[ind.code];
+          return sum + (value !== undefined ? Math.abs(value) : 0);
+        }, 0);
+      });
+      
+      matrixDiv.innerHTML = `
+        <h5>Sector-Indicator Values Matrix:</h5>
+        <table style="border-collapse: collapse; margin-top: 10px; font-size: 10px;">
+          <thead>
+            <tr>
+              <th style="border: 1px solid #ccc; padding: 4px;">Sector</th>
+              ${indicators.map(ind => `<th style="border: 1px solid #ccc; padding: 4px; writing-mode: vertical-rl; text-orientation: mixed; min-width: 30px;">${ind.code}</th>`).join('')}
+              <th style="border: 1px solid #ccc; padding: 4px; font-weight: bold;">Row Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${sectors.map(sector => {
+              // Calculate row total
+              const rowTotal = indicators.reduce((sum, ind) => {
+                const value = sector[ind.code];
+                return sum + (value !== undefined ? Math.abs(value) : 0);
+              }, 0);
+              
+              return `
+              <tr>
+                <td style="border: 1px solid #ccc; padding: 4px; font-weight: bold; max-width: 200px; overflow: hidden; text-overflow: ellipsis;">${sector.sector}</td>
+                ${indicators.map(ind => {
+                  const value = sector[ind.code];
+                  return `<td style="border: 1px solid #ccc; padding: 4px; text-align: right;">${value !== undefined ? value.toFixed(3) : 'N/A'}</td>`;
+                }).join('')}
+                <td style="border: 1px solid #ccc; padding: 4px; text-align: right; font-weight: bold;">${rowTotal.toFixed(3)}</td>
+              </tr>
+              `;
+            }).join('')}
+            <tr style="font-weight: bold;">
+              <td style="border: 1px solid #ccc; padding: 4px;">Column Total</td>
+              ${columnTotals.map(total => `<td style="border: 1px solid #ccc; padding: 4px; text-align: right;">${total.toFixed(3)}</td>`).join('')}
+              <td style="border: 1px solid #ccc; padding: 4px;"></td>
+            </tr>
+          </tbody>
+        </table>
+      `;
+      
+      // Append matrix after indicators list
+      indicatorsDiv.appendChild(matrixDiv);
+    }
+
+    // Chart preferences management with localStorage
+    const ChartPreferences = {
+      // Default values
+      defaults: {
+        scalingMethod: 'raw',
+        edgeStyle: 'light',
+        themeMode: 'light'
+      },
+      
+      // Save preferences to localStorage
+      save: function(scalingMethod, edgeStyle, themeMode) {
+        const prefs = {
+          scalingMethod: scalingMethod || this.defaults.scalingMethod,
+          edgeStyle: edgeStyle || this.defaults.edgeStyle,
+          themeMode: themeMode || this.defaults.themeMode,
+          timestamp: Date.now()
+        };
+        localStorage.setItem('chartPreferences', JSON.stringify(prefs));
+        console.log('Chart preferences saved:', prefs);
+      },
+      
+      // Load preferences from localStorage
+      load: function() {
+        try {
+          const stored = localStorage.getItem('chartPreferences');
+          if (stored) {
+            const prefs = JSON.parse(stored);
+            console.log('Chart preferences loaded:', prefs);
+            return {
+              scalingMethod: prefs.scalingMethod || this.defaults.scalingMethod,
+              edgeStyle: prefs.edgeStyle || this.defaults.edgeStyle,
+              themeMode: prefs.themeMode || this.defaults.themeMode
+            };
+          }
+        } catch (error) {
+          console.warn('Error loading chart preferences:', error);
+        }
+        return this.defaults;
+      },
+      
+      // Apply preferences to dropdowns
+      applyToDropdowns: function(scalingSelect, edgeSelect, themeSelect) {
+        const prefs = this.load();
+        if (scalingSelect && scalingSelect.value !== prefs.scalingMethod) {
+          scalingSelect.value = prefs.scalingMethod;
+        }
+        if (edgeSelect && edgeSelect.value !== prefs.edgeStyle) {
+          edgeSelect.value = prefs.edgeStyle;
+        }
+        if (themeSelect && themeSelect.value !== prefs.themeMode) {
+          themeSelect.value = prefs.themeMode;
+        }
+        return prefs;
+      }
+    };
+    
+    // Make ChartPreferences globally available for other pages
+    window.ChartPreferences = ChartPreferences;
+
+    main();
+
+    // Add event listeners for control dropdowns
+    document.addEventListener('DOMContentLoaded', function() {
+      const scalingSelect = document.getElementById('scaling-method');
+      const edgeSelect = document.getElementById('edge-style');
+      const themeSelect = document.getElementById('theme-mode');
+      
+      // Load and apply saved preferences on page load
+      const savedPrefs = ChartPreferences.applyToDropdowns(scalingSelect, edgeSelect, themeSelect);
+      console.log('Applied saved chart preferences:', savedPrefs);
+      
+      // Apply theme mode on page load if setSitelook function exists
+      if (typeof setSitelook === 'function') {
+        setSitelook(savedPrefs.themeMode);
+      }
+      
+      function updateChordDiagram() {
+        if (window.currentChordData) {
+          const selectedScaling = scalingSelect ? scalingSelect.value : savedPrefs.scalingMethod;
+          const selectedEdge = edgeSelect ? edgeSelect.value : savedPrefs.edgeStyle;
+          const selectedTheme = themeSelect ? themeSelect.value : savedPrefs.themeMode;
+          
+          // Save preferences whenever they change
+          ChartPreferences.save(selectedScaling, selectedEdge, selectedTheme);
+          
+          console.log(`Updating chart - Scaling: ${selectedScaling}, Edge: ${selectedEdge}`);
+          
+          try {
+            initializeChordDiagram(
+              window.currentChordData.sectors, 
+              window.currentChordData.indicators, 
+              { 
+                containerId: '#chart2',
+                scalingMethod: selectedScaling,
+                chordBorder: {
+                  style: selectedEdge,
+                  width: "1px"
+                }
+              }
+            );
+          } catch (error) {
+            console.error('Error updating chord diagram:', error);
+          }
+        }
+      }
+      
+      if (scalingSelect) {
+        scalingSelect.addEventListener('change', updateChordDiagram);
+      }
+      
+      if (edgeSelect) {
+        edgeSelect.addEventListener('change', updateChordDiagram);
+      }
+      
+      if (themeSelect) {
+        themeSelect.addEventListener('change', function() {
+          const selectedTheme = this.value;
+          console.log(`Theme changed to: ${selectedTheme}`);
+          
+          // Apply theme change using setSitelook function if available
+          if (typeof setSitelook === 'function') {
+            setSitelook(selectedTheme);
+          }
+          
+          // Update preferences and chart
+          updateChordDiagram();
+        });
+      }
+      
+      // Trigger initial update with saved preferences if data is already loaded
+      if (window.currentChordData) {
+        updateChordDiagram();
+      }
+    });
+
+  </script>
+
+
+<style>
+line {
+  stroke: #000;
+  stroke-width: 1.px;
+}
+path.chord {
+  fill-opacity: .80;
+}
+.title {
+  text-anchor: middle;
+  fill: #3B3B3B;
+  font-weight: bold;
+  font-size: 16px;
+}
+.titleLine {
+  stroke: #DCDCDC;
+  shape-rendering: crispEdges;
+}
+
+/* Dark mode styling */
+.dark .title {
+  fill: white;
+}
+.dark .titleLine {
+  stroke: #666;
+}
+.dark text.titles {
+  fill: white;
+}
+.dark #scaling-method,
+.dark #edge-style {
+  background: #333;
+  color: white;
+  border-color: #555;
+}
+.dark #scaling-method option,
+.dark #edge-style option {
+  background: #333;
+  color: white;
+}
+
+/* Dark mode for matrix table */
+.dark #chart2-debug {
+  color: white;
+}
+.dark #chart2-debug table {
+  border-color: #555;
+}
+.dark #chart2-debug th,
+.dark #chart2-debug td {
+  border-color: #555;
+  color: white;
+}    
+</style>
+
+<div class="content contentpadding">
+<!-- D3 Separated chord chart - initial test chart -->
+<div id="chart1"></div>
+
+<!-- Tooltip for chart hover effects -->
+<div id="chord-tooltip" style="position: absolute; background: rgba(0,0,0,0.8); color: white; padding: 8px 12px; border-radius: 4px; font-size: 12px; pointer-events: none; z-index: 1000; opacity: 0; transition: opacity 0.2s;"></div>
+
+<!-- Debug output for chart2 data -->
+<div id="chart2-debug">
+  <h4>Chord Chart Data:</h4>
+  <div id="sectors-list"></div>
+  <div id="indicators-list"></div>
+</div>
+<svg height="0cm" width="0cm">
+  <defs>
+    <linearGradient id="gradientLinear" x1="-100%" y1="0%" x2="100%" y2="0%" gradientUnits="userSpaceOnUse">
+      <stop offset="-100%" stop-color="#858585" stop-opacity=".5">
+        <animate attributeName="offset" values="-1;0" dur="5s" repeatCount="indefinite"></animate>
+      </stop>
+      
+      <stop offset="-75%" stop-color="#BEBEBE" stop-opacity=".5">
+        <animate attributeName="offset" values="-0.75;0.25" dur="5s" repeatCount="indefinite"></animate>
+      </stop>
+      
+      <stop offset="-50%" stop-color="#858585" stop-opacity=".5">
+        <animate attributeName="offset" values="-0.5;0.5" dur="5s" repeatCount="indefinite"></animate>
+      </stop>
+      
+      <stop offset="-25%" stop-color="#BEBEBE" stop-opacity=".5">
+        <animate attributeName="offset" values="-0.25;0.75" dur="5s" repeatCount="indefinite"></animate>
+      </stop>
+      
+      <stop offset="0%" stop-color="#858585" stop-opacity=".5">
+        <animate attributeName="offset" values="0;1" dur="5s" repeatCount="indefinite"></animate>
+      </stop>
+      
+      <stop offset="25%" stop-color="#BEBEBE" stop-opacity=".5">
+        <animate attributeName="offset" values="0.25;1.25" dur="5s" repeatCount="indefinite"></animate>
+      </stop>
+      
+      <stop offset="50%" stop-color="#858585" stop-opacity=".5">
+        <animate attributeName="offset" values="0.5;1.5" dur="5s" repeatCount="indefinite"></animate>
+      </stop>   
+      
+      <stop offset="75%" stop-color="#BEBEBE" stop-opacity=".5">
+        <animate attributeName="offset" values="0.75;1.75" dur="5s" repeatCount="indefinite"></animate>
+      </stop>
+      
+      <stop offset="100%" stop-color="#858585" stop-opacity=".5">
+        <animate attributeName="offset" values="1;2" dur="5s" repeatCount="indefinite"></animate>
+      </stop>
+    </linearGradient>
+  </defs>
+</svg>
+<br>
+
+<b><a href="chord/">Our Stretched Chord Chart documentation</a></b><br>
+
+<!--
+Use the stand-alone <a href="chord/stretched">cord/stretched</a> for dev.<br>
+-->
+
+<!--
+TODO: Horizontal Titles - Add angled lines where the titles currently reside.<br>
+Have each angled line connect to a horizontal line that travels under each title.<br>
+-->
+
+Next we'll create a <a href="/io/charts/sankey/">Sankey chart</a> with the same data.
+</div>
+
+</body>
+</html>

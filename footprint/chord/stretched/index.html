@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta http-equiv="Content-Type" content="text/html;charset=utf-8"/>
+  <title>D3 v7 Separated Chord Chart</title>
+  <link rel="shortcut icon" href="data:image/x-icon;," type="image/x-icon">
+  <!-- D3.js v7.9.0 -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+
+<style>
+line {
+  stroke: #000;
+  stroke-width: 1.px;
+}
+path.chord {
+  fill-opacity: .80;
+}
+.title {
+  text-anchor: middle;
+  fill: #3B3B3B;
+  font-weight: 300;
+  font-size: 16px;
+}
+.titleLine {
+  stroke: #DCDCDC;
+  shape-rendering: crispEdges;
+}    
+</style>
+</head>
+<body>
+
+<!-- D3 Separated chord chart -->
+<div id="chart"></div>
+<svg height="0cm" width="0cm">
+  <defs>
+    <linearGradient id="gradientLinear" x1="-100%" y1="0%" x2="100%" y2="0%" gradientUnits="userSpaceOnUse">
+      <stop offset="-100%" stop-color="#858585" stop-opacity=".5">
+        <animate attributeName="offset" values="-1;0" dur="5s" repeatCount="indefinite"></animate>
+      </stop>
+      
+      <stop offset="-75%" stop-color="#BEBEBE" stop-opacity=".5">
+        <animate attributeName="offset" values="-0.75;0.25" dur="5s" repeatCount="indefinite"></animate>
+      </stop>
+      
+      <stop offset="-50%" stop-color="#858585" stop-opacity=".5">
+        <animate attributeName="offset" values="-0.5;0.5" dur="5s" repeatCount="indefinite"></animate>
+      </stop>
+      
+      <stop offset="-25%" stop-color="#BEBEBE" stop-opacity=".5">
+        <animate attributeName="offset" values="-0.25;0.75" dur="5s" repeatCount="indefinite"></animate>
+      </stop>
+      
+      <stop offset="0%" stop-color="#858585" stop-opacity=".5">
+        <animate attributeName="offset" values="0;1" dur="5s" repeatCount="indefinite"></animate>
+      </stop>
+      
+      <stop offset="25%" stop-color="#BEBEBE" stop-opacity=".5">
+        <animate attributeName="offset" values="0.25;1.25" dur="5s" repeatCount="indefinite"></animate>
+      </stop>
+      
+      <stop offset="50%" stop-color="#858585" stop-opacity=".5">
+        <animate attributeName="offset" values="0.5;1.5" dur="5s" repeatCount="indefinite"></animate>
+      </stop>   
+      
+      <stop offset="75%" stop-color="#BEBEBE" stop-opacity=".5">
+        <animate attributeName="offset" values="0.75;1.75" dur="5s" repeatCount="indefinite"></animate>
+      </stop>
+      
+      <stop offset="100%" stop-color="#858585" stop-opacity=".5">
+        <animate attributeName="offset" values="1;2" dur="5s" repeatCount="indefinite"></animate>
+      </stop>
+    </linearGradient>
+  </defs>
+</svg>
+<script src="script.js"></script>
+
+</body>
+</html>

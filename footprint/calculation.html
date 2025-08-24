@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset='utf-8'>
+  <title>Calculation example</title>
+  <link rel="shortcut icon" href="data:image/x-icon;," type="image/x-icon">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <link href="https://unpkg.com/tabulator-tables@5.2.7/dist/css/tabulator.min.css" rel="stylesheet">
+  <script type="text/javascript" src="https://unpkg.com/tabulator-tables@5.2.7/dist/js/tabulator.min.js"></script>
+
+  <link rel="stylesheet" href="https://model.earth/localsite/css/base.css" id="/localsite/css/base.css" />
+  <script type="text/javascript" src="https://model.earth/localsite/js/localsite.js?showheader=true&showsearch=true"></script>
+  
+  <script src="../dist/useeio.js"></script>
+</head>
+
+<body>
+
+  <div style="margin:0px 20px 20px 20px">
+    <div style="margin-bottom:10px">
+      <a id="footprintLink" href="./" >State Impact Reports</a>
+    </div>
+    <div id="relocatedStateMenu"></div>
+    <p id="info" style="margin:20px">Loading ...</p>
+    <div id="table"></div>
+  </div>
+  
+  <script src="./config.js"></script>
+  <script>
+    document.addEventListener('hashChangeEvent', function (elem) {
+      console.log("useeio.js detects URL hashChangeEvent");
+      hashChangedUseeio();
+    }, false);
+    function hashChangedUseeio() {
+        model = getModel();
+        pageScript();
+    }
+
+    function pageScript() {
+      (async () => {
+
+        // try to find a demand vector
+        const info = document.getElementById("info");
+        const demandId = await model.findDemand({
+          location: "US",
+          system: "Complete",
+          type: "Consumption",
+        });
+
+        if (!demandId) {
+          info.textContent = "Failed to load demand";
+          return;
+        }
+        info.textContent = `Calculating results for demand: ${demandId} ...`;
+
+        // get the demand vector and calculate results
+        const demand = await model.demand(demandId);
+        const result = await model.calculate({
+          perspective: 'direct',
+          demand,
+        });
+
+        // map results to a table
+        const indicators = await model.indicators();
+        const totals = indicators.map(indicator => {
+          return {
+            name: `${indicator.name} - ${indicator.code}`,
+            result: result.totals[indicator.index],
+            unit: indicator.unit,
+          }
+        });
+        info.textContent = `Results for demand: ${demandId}`;
+        new Tabulator("#table", {
+          data: totals,
+          layout: "fitColumns",
+          columns: [
+            { title: "Indicator", field: "name" },
+            { title: "Result", field: "result" },
+            { title: "Unit", field: "unit" },
+          ],
+        });
+
+      })();
+    }
+    pageScript();
+  </script>
+
+</body>
+</html>

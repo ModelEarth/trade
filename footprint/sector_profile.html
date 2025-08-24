@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset='utf-8'>
+  <title>Sector Analysis - Environmental profile</title>
+  <link rel="shortcut icon" href="data:image/x-icon;," type="image/x-icon">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <link href="https://unpkg.com/tabulator-tables@5.2.7/dist/css/tabulator.min.css" rel="stylesheet">
+  <script type="text/javascript" src="https://unpkg.com/tabulator-tables@5.2.7/dist/js/tabulator.min.js"></script>
+
+  <script type="text/javascript" src="/localsite/js/localsite.js?showheader=true&showsearch=true"></script>
+  <script src="../dist/useeio.js"></script>
+</head>
+
+<body>
+
+<div class="content contentpadding">
+  <div style="margin-bottom:10px">
+    <a id="footprintLink" href="./">State Impact Reports</a> - 
+    <a id="commoditiesLink" href="commodities.html">Commodities</a>
+  </div>
+  <div id="relocatedStateMenu"></div>
+  
+  <p id="info">Loading ...</p>
+  <div id="table"></div>
+</div>
+
+<script src="./config.js"></script>
+<script>
+document.addEventListener('hashChangeEvent', hashChangedUseeio, false);
+function hashChangedUseeio() {
+  console.log("URL hash changed");
+  model = getModel();
+  updateHash({"demand":""});
+  main();
+}
+
+function norm100(nums) {
+  let max = 0;
+  for (const num of nums) {
+    max = Math.max(Math.abs(num), max);
+  }
+  if (max === 0) {
+    return nums;
+  }
+  const norm = [];
+  for (const num of nums) {
+    norm.push(100 * num / max)
+  }
+  return norm;
+}
+
+async function getRandomSector() {
+  const sectors = await model.sectors();
+  return sectors[Math.floor(Math.random() * sectors.length)];
+}
+
+async function main() {
+  let hash = getHash();
+  if (hash.state) {
+    // Append to links at top of page.
+    document.getElementById('footprintLink').setAttribute('href', '../#state=' + hash.state);
+    document.getElementById('commoditiesLink').setAttribute('href', 'commodities.html#state=' + hash.state);
+  }
+  const info = document.getElementById("info");
+  
+  // Parse URL parameters
+  //const fullhash = window.location.hash;
+  //const params = new URLSearchParams(fullhash.substring(1));
+  
+  let sector;
+  const sectors = await model.sectors();
+
+  // loading random sector profile report if no hash
+  if (!hash.demand) {
+    sector = await getRandomSector();
+    // update URL with random sector's hash
+    hash.demand = `${sector.code}/${sector.location}`;
+    updateHash({"demand":hash.demand});
+  }
+  
+  // Handle demand parameter (new format)
+  if (hash.demand) {
+    const [code, location] = hash.demand.split("/");
+    sector = sectors.find(s => s.code === code && s.location === location);
+  }
+  // Handle index parameter (legacy format)
+  else if (hash.index) {
+    const sectorIndex = parseInt(hash.index);
+    sector = sectors.find(s => s.index === sectorIndex);
+  }
+  // Handle legacy industry parameter
+  else if (hash.industry) {
+    const sectorIndex = parseInt(hash.industry);
+    sector = sectors.find(s => s.index === sectorIndex);
+  }
+  
+  /*
+  let stateCode;
+  if (hash.state) {
+    stateCode = hash.state;
+  } else 
+
+  if (hash.demand) {
+    const [code, location] = hash.demand.split('/');
+    if (!location) {
+      info.textContent = "No location value in demand: " + hash.demand;
+      document.getElementById('table').innerHTML = "";
+      return;
+    } else if (location.includes('/')) {
+      stateCode = location.split('/')[1];
+    }
+  }
+  */
+
+  if (!sector) {
+    info.textContent = "No valid sector specified in the URL.";
+    if (hash.state) {
+      info.textContent = `No valid sector specified in the URL in ${hash.state} model.`;
+    }
+    document.getElementById('table').innerHTML = "";
+    return;
+  }
+
+  const demandId = await model.findDemand({
+    system: "Complete",
+    type: "Consumption",
+  });
+  if (!demandId) {
+    info.textContent = "Failed to load demand";
+    document.getElementById('table').innerHTML = "";
+    return;
+  }
+  
+  info.textContent = `Analyzing sector '${sector.name}' based on ${demandId}`;
+
+  const analysis = await useeio.SectorAnalysis.of(model, sector, demandId);
+  const indicators = await model.indicators();
+  const direct = norm100(await analysis.getEnvironmentalProfile(true));
+  const total = norm100(await analysis.getEnvironmentalProfile(false));
+  const results = indicators.map(i => {
+    return {
+      indicator: `${i.code} - ${i.name}`,
+      direct: direct[i.index],
+      total: total[i.index],
+    }
+  });
+
+  info.innerHTML = `<h3 style="font-size:22px">${sector.name}</h3>Environmental profile of based on ${demandId} for <b>${sector.id}</b>`;
+  new Tabulator("#table", {
+    data: results,
+    layout: "fitColumns",
+    columns: [
+      { title: "Indicator", field: "indicator" },
+      { title: "Direct", field: "direct", formatter: "progress", sorter: "number", headerSortTristate: false, headerSortStartingDir: "desc" },
+      { title: "Total", field: "total", formatter: "progress", sorter: "number" },
+    ],
+    initialSort: [
+      { column: "total", dir: "desc" },
+    ]
+  });
+}
+main();
+</script>
+
+</body>
+</html>

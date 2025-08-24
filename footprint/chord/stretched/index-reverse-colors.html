@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta http-equiv="Content-Type" content="text/html;charset=utf-8"/>
+  <title>D3 v7 Separated Chord Chart</title>
+  <link rel="shortcut icon" href="data:image/x-icon;," type="image/x-icon">
+  <!-- D3.js v7.9.0 -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+
+  <style>
+    body {
+      font-family: 'Open Sans', sans-serif;
+      font-size: 12px;
+      font-weight: 400;
+      color: #525252;
+      text-align: center;
+    }
+    
+    html, body {
+      width: auto;
+      height: auto;
+    }
+    
+    line {
+      stroke: #000;
+      stroke-width: 1.px;
+    }
+
+    text {
+      font-size: 8px;
+    }
+
+    .titles {
+      font-size: 10px;
+    }
+
+    path.chord {
+      fill-opacity: .80;
+    }
+    
+    .title {
+      text-anchor: middle;
+      fill: #3B3B3B;
+      font-weight: 300;
+      font-size: 16px;
+    }
+    .titleLine {
+      stroke: #DCDCDC;
+      shape-rendering: crispEdges;
+    }    
+    @media (min-width: 500px) {
+      .explanation {
+        width: 50%; 
+        margin: 0 auto;
+      }
+    }
+  </style>
+</head>
+<body>
+
+<div id="chart"></div>
+<div class="explanation">About chart</div>
+
+<!-- Animated gradient for Chord Diagram -->
+              
+<svg height="0cm" width="0cm">
+  <defs>
+    <linearGradient id="gradientLinear" x1="-100%" y1="0%" x2="100%" y2="0%" gradientUnits="userSpaceOnUse">
+      <stop offset="-100%" stop-color="#858585" stop-opacity=".5">
+        <animate attributeName="offset" values="-1;0" dur="5s" repeatCount="indefinite"></animate>
+      </stop>
+      
+      <stop offset="-75%" stop-color="#BEBEBE" stop-opacity=".5">
+        <animate attributeName="offset" values="-0.75;0.25" dur="5s" repeatCount="indefinite"></animate>
+      </stop>
+      
+      <stop offset="-50%" stop-color="#858585" stop-opacity=".5">
+        <animate attributeName="offset" values="-0.5;0.5" dur="5s" repeatCount="indefinite"></animate>
+      </stop>
+      
+      <stop offset="-25%" stop-color="#BEBEBE" stop-opacity=".5">
+        <animate attributeName="offset" values="-0.25;0.75" dur="5s" repeatCount="indefinite"></animate>
+      </stop>
+      
+      <stop offset="0%" stop-color="#858585" stop-opacity=".5">
+        <animate attributeName="offset" values="0;1" dur="5s" repeatCount="indefinite"></animate>
+      </stop>
+      
+      <stop offset="25%" stop-color="#BEBEBE" stop-opacity=".5">
+        <animate attributeName="offset" values="0.25;1.25" dur="5s" repeatCount="indefinite"></animate>
+      </stop>
+      
+      <stop offset="50%" stop-color="#858585" stop-opacity=".5">
+        <animate attributeName="offset" values="0.5;1.5" dur="5s" repeatCount="indefinite"></animate>
+      </stop>   
+      
+      <stop offset="75%" stop-color="#BEBEBE" stop-opacity=".5">
+        <animate attributeName="offset" values="0.75;1.75" dur="5s" repeatCount="indefinite"></animate>
+      </stop>
+      
+      <stop offset="100%" stop-color="#858585" stop-opacity=".5">
+        <animate attributeName="offset" values="1;2" dur="5s" repeatCount="indefinite"></animate>
+      </stop>
+    </linearGradient>
+  </defs>
+</svg>  
+
+<script>
+// D3 v7 Separated chord chart
+// Updated from D3 v3 original version
+
+// Global variables
+let pullOutSize;
+
+// Custom Chord Function adjusted from the original d3.svg.chord() function
+// Modified for D3 v7
+function stretchedChord() {
+    let source = d => d.source;
+    let target = d => d.target;
+    let radius = d => d.radius;
+    let startAngle = d => d.startAngle;
+    let endAngle = d => d.endAngle;
+    
+    const π = Math.PI;
+    const halfπ = π / 2;
+
+    function subgroup(self, f, d, i) {
+        let subgroup = f(d);
+        let r = radius(subgroup);
+        let a0 = startAngle(subgroup) - halfπ;
+        let a1 = endAngle(subgroup) - halfπ;
+        return {
+            r: r,
+            a0: [a0],
+            a1: [a1],
+            p0: [r * Math.cos(a0), r * Math.sin(a0)],
+            p1: [r * Math.cos(a1), r * Math.sin(a1)]
+        };
+    }
+
+    function arc(r, p, a) {
+        let sign = (p[0] >= 0 ? 1 : -1);
+        return "A" + r + "," + r + " 0 " + +(a > π) + ",1 " + (p[0] + sign*pullOutSize) + "," + p[1];
+    }
+
+    function curve(p1) {
+        let sign = (p1[0] >= 0 ? 1 : -1);
+        return "Q 0,0 " + (p1[0] + sign*pullOutSize) + "," + p1[1];
+    }
+
+    /*
+    M = moveto
+    M x,y
+    Q = quadratic Bézier curve
+    Q control-point-x,control-point-y end-point-x, end-point-y
+    A = elliptical Arc
+    A rx, ry x-axis-rotation large-arc-flag, sweep-flag  end-point-x, end-point-y
+    Z = closepath
+    */
+    function chord(d) {
+        let s = subgroup(this, source, d);
+        let t = subgroup(this, target, d);
+                
+        return "M" + (s.p0[0] + pullOutSize) + "," + s.p0[1] + 
+                arc(s.r, s.p1, s.a1 - s.a0) + 
+                curve(t.p0) + 
+                arc(t.r, t.p1, t.a1 - t.a0) + 
+                curve(s.p0) + 
+                "Z";
+    }//chord
+
+    chord.radius = function(v) {
+        if (!arguments.length) return radius;
+        radius = typeof v === "function" ? v : () => v;
+        return chord;
+    };
+    
+    chord.source = function(v) {
+        if (!arguments.length) return source;
+        source = typeof v === "function" ? v : () => v;
+        return chord;
+    };
+    
+    chord.target = function(v) {
+        if (!arguments.length) return target;
+        target = typeof v === "function" ? v : () => v;
+        return chord;
+    };
+    
+    chord.startAngle = function(v) {
+        if (!arguments.length) return startAngle;
+        startAngle = typeof v === "function" ? v : () => v;
+        return chord;
+    };
+    
+    chord.endAngle = function(v) {
+        if (!arguments.length) return endAngle;
+        endAngle = typeof v === "function" ? v : () => v;
+        return chord;
+    };
+    
+    return chord;
+}
+
+// Custom Chord Layout - updated for D3 v7
+function customChordLayout() {
+    const τ = 2 * Math.PI;
+    let chord = {},
+        chords,
+        groups,
+        matrix,
+        n,
+        padding = 0,
+        sortGroups,
+        sortSubgroups,
+        sortChords;
+
+    function relayout() {
+        let subgroups = {};
+        let groupSums = [];
+        let groupIndex = d3.range(n);
+        let subgroupIndex = [];
+        let k;
+        let x;
+        let x0;
+        let i;
+        let j;
+        
+        chords = [];
+        groups = [];
+        
+        k = 0, i = -1;
+        while (++i < n) {
+            x = 0, j = -1;
+            while (++j < n) {
+                x += matrix[i][j];
+            }
+            groupSums.push(x);
+            subgroupIndex.push(d3.range(n).reverse());
+            k += x;
+        }
+        
+        if (sortGroups) {
+            groupIndex.sort((a, b) => sortGroups(groupSums[a], groupSums[b]));
+        }
+        
+        if (sortSubgroups) {
+            subgroupIndex.forEach((d, i) => {
+                d.sort((a, b) => sortSubgroups(matrix[i][a], matrix[i][b]));
+            });
+        }
+        
+        k = (τ - padding * n) / k;
+        x = 0, i = -1;
+        while (++i < n) {
+            let di = groupIndex[i]; // Define di here
+            x0 = x, j = -1;
+            while (++j < n) {
+                let dj = subgroupIndex[di][j];
+                let v = matrix[di][dj];
+                let a0 = x;
+                let a1 = x += v * k;
+                subgroups[di + "-" + dj] = {
+                    index: di,
+                    subindex: dj,
+                    startAngle: a0,
+                    endAngle: a1,
+                    value: v
+                };
+            }
+            groups[di] = { // Use di as the index for groups
+                index: di,
+                startAngle: x0,
+                endAngle: x,
+                value: (x - x0) / k
+            };
+            x += padding;
+        }
+        
+        i = -1;
+        while (++i < n) {
+            j = i - 1;
+            while (++j < n) {
+                let source = subgroups[i + "-" + j];
+                let target = subgroups[j + "-" + i];
+                if (source.value || target.value) {
+                    chords.push(source.value < target.value ? {
+                        source: target,
+                        target: source
+                    } : {
+                        source: source,
+                        target: target
+                    });
+                }
+            }
+        }
+        
+        if (sortChords) resort();
+    }
+    
+    function resort() {
+        chords.sort((a, b) => sortChords((a.source.value + a.target.value) / 2, (b.source.value + b.target.value) / 2));
+    }
+    
+    chord.matrix = function(x) {
+        if (!arguments.length) return matrix;
+        n = (matrix = x) && matrix.length;
+        chords = groups = null;
+        return chord;
+    };
+    
+    chord.padding = function(x) {
+        if (!arguments.length) return padding;
+        padding = x;
+        chords = groups = null;
+        return chord;
+    };
+    
+    chord.sortGroups = function(x) {
+        if (!arguments.length) return sortGroups;
+        sortGroups = x;
+        chords = groups = null;
+        return chord;
+    };
+    
+    chord.sortSubgroups = function(x) {
+        if (!arguments.length) return sortSubgroups;
+        sortSubgroups = x;
+        chords = null;
+        return chord;
+    };
+    
+    chord.sortChords = function(x) {
+        if (!arguments.length) return sortChords;
+        sortChords = x;
+        if (chords) resort();
+        return chord;
+    };
+    
+    chord.chords = function() {
+        if (!chords) relayout();
+        return chords;
+    };
+    
+    chord.groups = function() {
+        if (!groups) relayout();
+        return groups;
+    };
+    
+    return chord;
+}
+
+// Screen size detection
+const screenWidth = $(window).innerWidth();
+const mobileScreen = (screenWidth > 500 ? false : true);
+
+// Margins and dimensions
+const margin = {left: 50, top: 10, right: 50, bottom: 10};
+const width = Math.min(screenWidth, 800) - margin.left - margin.right;
+const height = (mobileScreen ? 300 : Math.min(screenWidth, 800)*5/6) - margin.top - margin.bottom;
+
+// Create SVG
+const svg = d3.select("#chart").append("svg")
+    .attr("width", (width + margin.left + margin.right))
+    .attr("height", (height + margin.top + margin.bottom));
+
+// Create wrapper group
+const wrapper = svg.append("g")
+    .attr("class", "chordWrapper")
+    .attr("transform", `translate(${width / 2 + margin.left},${height / 2 + margin.top})`);
+
+// Define dimensions
+const outerRadius = Math.min(width, height) / 2 - (mobileScreen ? 80 : 100);
+const innerRadius = outerRadius * 0.95;
+const opacityDefault = 0.7; // default opacity of chords
+const opacityLow = 0.02; // hover opacity of those chords not hovered over
+
+// Set pullout size based on screen
+pullOutSize = (mobileScreen ? 20 : 50); // Pull distance for arcs
+
+// Titles on top
+const titleWrapper = svg.append("g").attr("class", "chordTitleWrapper");
+const titleOffset = mobileScreen ? 15 : 40;
+const titleSeparate = mobileScreen ? 30 : 0;
+
+// Title top left
+titleWrapper.append("text")
+    .attr("class", "title left")
+    .style("font-size", mobileScreen ? "12px" : "16px")
+    .attr("x", (width/2 + margin.left - outerRadius - titleSeparate))
+    .attr("y", titleOffset)
+    .text("Left side");
+
+titleWrapper.append("line")
+    .attr("class", "titleLine left")
+    .attr("x1", (width/2 + margin.left - outerRadius - titleSeparate)*0.6)
+    .attr("x2", (width/2 + margin.left - outerRadius - titleSeparate)*1.4)
+    .attr("y1", titleOffset+8)
+    .attr("y2", titleOffset+8);
+
+// Title top right
+titleWrapper.append("text")
+    .attr("class", "title right")
+    .style("font-size", mobileScreen ? "12px" : "16px")
+    .attr("x", (width/2 + margin.left + outerRadius + titleSeparate))
+    .attr("y", titleOffset)
+    .text("Right side");
+
+titleWrapper.append("line")
+    .attr("class", "titleLine right")
+    .attr("x1", (width/2 + margin.left - outerRadius - titleSeparate)*0.6 + 2*(outerRadius + titleSeparate))
+    .attr("x2", (width/2 + margin.left - outerRadius - titleSeparate)*1.4 + 2*(outerRadius + titleSeparate))
+    .attr("y1", titleOffset+8)
+    .attr("y2", titleOffset+8);
+
+// Data definition
+const Names = ["Domein HR","Logistiek en Financien","Domein ICTS","Servicepunt","Domein Onderzoek","Fac. Inter/intranet","Ondersteuning Lokale Infrastructuur","Other", "",
+    "Other.in","Domein Onderwijs.in","Domein Onderzoek.in","Servicepunt.in","Domein ICTS.in","Logistiek en Financien.in","Domein HR.in",""];
+
+const respondents = 4443; // Total number of respondents
+const emptyPerc = 0.5; // What % of the circle should become empty
+const emptyStroke = Math.round(respondents * emptyPerc);
+
+// Matrix data
+const matrix = [
+[0, 0,0,0,0,0,0,0, 0, 7,  3,  9,  0,  274,    3,  1478,   0], //  Domein HR
+[0, 0,0,0,0,0,0,0, 0, 17, 2,  17, 0,  804,    1211,   14, 0], //  Logistiek en Financien
+[0, 0,0,0,0,0,0,0, 0, 31, 0,  0,  90, 334,    13, 7,  0], //  Domein ICTS
+[0, 0,0,0,0,0,0,0, 0, 0,  0,  0,  0,  2,  0,  45, 0], //  Servicepunt
+[0, 0,0,0,0,0,0,0, 0, 0,  0,  0,  0,  1,  27, 3,  0], //  Domein Onderzoek
+[0, 0,0,0,0,0,0,0, 0, 0,  0,  0,  0,  0,  0,  11, 0], //  Fac. Inter/intranet
+[0, 0,0,0,0,0,0,0, 0, 0,  0,  0,  0,  0,  7,  2,  0], //  Ondersteuning Lokale Infrastructuur
+[0, 0,0,0,0,0,0,0, 0, 0,  0,  0,  0,  3,  13, 16, 0], //  Other
+[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,emptyStroke], // dummyBottom
+[7, 17, 31, 0,  0,  0,  0,  0,  0,  0,0,0,0,0,0,0, 0], // Other.in
+[3, 2,  0,  0,  0,  0,  0,  0,  0,  0,0,0,0,0,0,0, 0], // Domein Onderwijs.in
+[9, 17, 0,  0,  0,  0,  0,  0,  0,  0,0,0,0,0,0,0, 0], // Domein Onderzoek.in
+[0, 0,  90, 0,  0,  0,  0,  0,  0,  0,0,0,0,0,0,0, 0], // Servicepunt.in
+[274,    804,    334,    2,  1,  0,  0,  3,  0,  0,0,0,0,0,0,0, 0], // Domein ICTS.in
+[3, 1211,   13, 0,  27, 0,  7,  13, 0,  0,0,0,0,0,0,0, 0], // Logistiek en Financien.in
+[1478,   14, 7,  45, 3,  11, 2,  16, 0,  0,0,0,0,0,0,0, 0], // Domein HR.in
+[0,0,0,0,0,0,0,0,emptyStroke,0,0,0,0,0,0,0,0] // dummyTop
+];
+
+// Calculate how far the Chord Diagram needs to be rotated clockwise
+const offset = (2 * Math.PI) * (emptyStroke/(respondents + emptyStroke))/4;
+
+// Create custom chord layout
+const chord = customChordLayout()
+    .padding(.02)
+    .sortChords(d3.descending) // chord display order
+    .matrix(matrix);
+
+// Create arc generator
+const arc = d3.arc()
+    .innerRadius(innerRadius)
+    .outerRadius(outerRadius)
+    .startAngle(d => d.startAngle + offset) // Include the offset
+    .endAngle(d => d.endAngle + offset);    // Include the offset
+
+// Create stretched chord path generator
+const path = stretchedChord()
+    .radius(innerRadius)
+    .startAngle(d => d.startAngle + offset)
+    .endAngle(d => d.endAngle + offset);
+
+// Draw outer Arcs
+const g = wrapper.selectAll("g.group")
+    .data(chord.groups())
+    .join("g")
+    .attr("class", "group")
+    .on("mouseover", function(event, d) {
+        fade(opacityLow)(d);
+    })
+    .on("mouseout", function(event, d) {
+        fade(opacityDefault)(d);
+    });
+
+// Create a color scale
+const colors = d3.schemeCategory10; // D3's built-in color scheme
+
+// Modify the arc path fill and stroke properties
+g.append("path")
+    .style("stroke", (d, i) => (Names[i] === "" ? "none" : colors[i % colors.length]))
+    .style("fill", (d, i) => (Names[i] === "" ? "none" : colors[i % colors.length]))
+    .style("opacity", 0.7) // Keep semi-transparency
+    .style("pointer-events", (d, i) => (Names[i] === "" ? "none" : "auto"))
+    .attr("d", arc)
+    .attr("transform", function(d) {
+        // Pull the two slices apart
+        d.pullOutSize = pullOutSize * (d.startAngle + 0.001 > Math.PI ? -1 : 1);
+        return `translate(${d.pullOutSize},0)`;
+    });
+
+// Create dynamic gradients for each chord
+const defs = svg.append("defs");
+
+// Helper function to determine which side of the diagram an index belongs to
+function isRightSide(index) {
+    // Indices 0-8 are left side, 9-16 are right side
+    return index >= 9;
+}
+
+// Create a gradient for each chord with proper coloring
+chord.chords().forEach((d, i) => {
+    if (Names[d.source.index] === "") return;
+    
+    // Determine colors for each end
+    const sourceColor = colors[d.source.index % colors.length];
+    const targetColor = colors[d.target.index % colors.length];
+    
+    // Create gradient
+    const gradient = defs.append("linearGradient")
+        .attr("id", `gradient-${i}`)
+        .attr("gradientUnits", "userSpaceOnUse");
+    
+    // Set proper gradient direction based on which side the elements are on
+    if (!isRightSide(d.source.index) && isRightSide(d.target.index)) {
+        // Left to right connection
+        gradient.attr("x1", "0%")
+               .attr("y1", "0%")
+               .attr("x2", "100%")
+               .attr("y2", "0%");
+               
+        // Add color stops with the left side color on the left, right side color on the right
+        gradient.append("stop")
+            .attr("offset", "0%")
+            .attr("stop-color", sourceColor)
+            .attr("stop-opacity", 0.7);
+            
+        gradient.append("stop")
+            .attr("offset", "50%")
+            .attr("stop-color", d3.interpolateRgb(sourceColor, targetColor)(0.5))
+            .attr("stop-opacity", 0.7);
+            
+        gradient.append("stop")
+            .attr("offset", "100%")
+            .attr("stop-color", targetColor)
+            .attr("stop-opacity", 0.7);
+    } else {
+        // Right to left connection 
+        gradient.attr("x1", "100%")
+               .attr("y1", "0%")
+               .attr("x2", "0%")
+               .attr("y2", "0%");
+               
+        // Reverse color stops for right to left
+        gradient.append("stop")
+            .attr("offset", "0%")
+            .attr("stop-color", targetColor)
+            .attr("stop-opacity", 0.7);
+            
+        gradient.append("stop")
+            .attr("offset", "50%")
+            .attr("stop-color", d3.interpolateRgb(targetColor, sourceColor)(0.5))
+            .attr("stop-opacity", 0.7);
+            
+        gradient.append("stop")
+            .attr("offset", "100%")
+            .attr("stop-color", sourceColor)
+            .attr("stop-opacity", 0.7);
+    }
+});
+
+// Update the chord paths to use the individual gradients
+wrapper.selectAll("path.chord")
+    .data(chord.chords())
+    .join("path")
+    .attr("class", "chord")
+    .style("stroke", "none")
+    .style("fill", (d, i) => Names[d.source.index] === "" ? "none" : `url(#gradient-${i})`)
+    .style("opacity", d => (Names[d.source.index] === "" ? 0 : opacityDefault))
+    .style("pointer-events", (d, i) => (Names[d.source.index] === "" ? "none" : "auto"))
+    .attr("d", path)
+    .on("mouseover", fadeOnChord)
+    .on("mouseout", (event, d) => fade(opacityDefault)(d));
+
+// Helper function for angle calculations
+function startAngle(d) { return d.startAngle + offset; }
+function endAngle(d) { return d.endAngle + offset; }
+
+// Append Names to arcs
+g.append("text")
+    .each(function(d) { 
+        d.angle = ((d.startAngle + d.endAngle) / 2) + offset;
+    })
+    .attr("dy", ".35em")
+    .attr("class", "titles")
+    .style("font-size", mobileScreen ? "8px" : "10px")
+    .attr("text-anchor", function(d) { 
+        return d.angle > Math.PI ? "end" : null; 
+    })
+    .attr("transform", function(d, i) { 
+        const c = arc.centroid(d);
+        return `translate(${c[0] + d.pullOutSize},${c[1]})` +
+               `rotate(${(d.angle * 180 / Math.PI - 90)})` +
+               `translate(20,0)` +
+               (d.angle > Math.PI ? "rotate(180)" : "");
+    })
+    .text((d, i) => Names[i])
+    .call(wrapChord, 100);
+
+// Returns an event handler for fading a given chord group
+function fade(opacity) {
+    return function(d) {
+        wrapper.selectAll("path.chord")
+            .filter(function(d2) { 
+                return d2.source.index != d.index && 
+                       d2.target.index != d.index && 
+                       Names[d2.source.index] != ""; 
+            })
+            .transition()
+            .style("opacity", opacity);
+    };
+}
+
+// Fade function when hovering over chord
+function fadeOnChord(event, d) {
+    const chosen = d;
+    wrapper.selectAll("path.chord")
+        .transition()
+        .style("opacity", function(d) {
+            if (d.source.index == chosen.source.index && d.target.index == chosen.target.index) {
+                return opacityDefault;
+            } else { 
+                return opacityLow; 
+            }
+        });
+}
+
+// Wraps SVG text
+function wrapChord(text, width) {
+    text.each(function() {
+        const text = d3.select(this);
+        const words = text.text().split(/\s+/).reverse();
+        let word;
+        let line = [];
+        let lineNumber = 0;
+        const lineHeight = 1.1; // ems
+        const y = 0;
+        const x = 0;
+        const dy = parseFloat(text.attr("dy"));
+        let tspan = text.text(null).append("tspan").attr("x", x).attr("y", y).attr("dy", dy + "em");
+
+        while (word = words.pop()) {
+            line.push(word);
+            tspan.text(line.join(" "));
+            if (tspan.node().getComputedTextLength() > width) {
+                line.pop();
+                tspan.text(line.join(" "));
+                line = [word];
+                tspan = text.append("tspan")
+                    .attr("x", x)
+                    .attr("y", y)
+                    .attr("dy", ++lineNumber * lineHeight + dy + "em")
+                    .text(word);
+            }
+        }
+    });
+}
+</script>
+</body>
+</html>

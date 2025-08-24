@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <title>State Impact Reports</title>
+  <link rel="shortcut icon" href="data:image/x-icon;," type="image/x-icon">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="/localsite/css/base.css" id="/localsite/css/base.css" />
+  <script type="text/javascript" src="/localsite/js/localsite.js?showheader=true&showsearch=true"></script>
+  
+  <!--
+  <link rel="stylesheet" href="../node_modules/mocha/mocha.css" />
+  -->
+</head>
+
+<body>
+
+  <!-- Try uncommenting after doing install for node-modules 
+  Also uncomment mocha.css above.
+  -->
+  <!--
+  <div id="mocha"></div>
+  <script src="../node_modules/mocha/mocha.js"></script>
+  <script src="../node_modules/chai/chai.js"></script>
+
+  <script src="../dist/useeio.js"></script>
+
+  <script class="mocha-init">
+    var assert = chai.assert;
+    var expect = chai.expect;
+    var webApi = new useeio.WebApi({
+      endpoint: 'http://localhost:8080/api',
+      asJsonFiles: true,
+    });
+    mocha.setup('bdd');
+  </script>
+
+<script src="model-requests.js"></script>
+<script src="matrix-requests.js"></script>
+
+  <script class="mocha-exec">
+    mocha.run();
+  </script>
+  -->
+<script>
+//loadMarkdown("schema.md", "schemaDiv", "_parent");
+//loadText("../../profile/impacts/exiobase/US-source/create-database.yaml", "yamlDiv", "_parent");
+loadMarkdown("../../profile/trade/nav.md", "navDiv", "_parent");
+loadMarkdown("README.md", "readmeDiv", "_parent");
+</script>
+
+<style>
+  a {
+    text-decoration:none;
+    color: #0366d6;
+  }
+  a:hover {
+    text-decoration: underline;
+  }
+  h1 {
+    margin-top: 0px;
+  }
+  td {
+    border: 1px solid #ccc;
+    padding:  5px;
+  }
+  th,td {
+    align: left;
+  }
+  #floatRightID {
+    min-width: 220px;
+    border-left: 1px solid #ccc;
+    padding-left: 30px;
+  }
+  @media (max-width: 800px) {
+    #floatRightID {
+      border-left: 0px;
+      padding: 30px 0;
+      border-top: 1px solid #ccc;
+      border-bottom: 1px solid #ccc;
+    }
+  }
+</style>
+
+
+<div class="content contentpadding">
+
+<div style="margin-right:30px" class="floatLeft">
+<div id="navDiv"></div>
+</div>
+
+<div id="readmeDiv"></div>
+
+</div>
+
+</body>
+</html>

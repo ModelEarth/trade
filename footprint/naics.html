@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset='utf-8'>
+  <title>NAICS Industries</title>
+  <link rel="shortcut icon" href="data:image/x-icon;," type="image/x-icon">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link href="https://unpkg.com/tabulator-tables@5.2.7/dist/css/tabulator.min.css" rel="stylesheet">
+  <script type="text/javascript" src="https://unpkg.com/tabulator-tables@5.2.7/dist/js/tabulator.min.js"></script>
+
+  <link rel="stylesheet" href="/localsite/css/base.css" id="/localsite/css/base.css" />
+  <script type="text/javascript" src="/localsite/js/localsite.js?showheader=true&showsearch=true"></script>
+  <script src="../dist/useeio.js"></script>
+  <style>
+  .input-container {
+    display: flex;
+    align-items: center;
+    margin-bottom: 10px;
+  }
+
+  .input-container>div {
+    margin-right: 10px;
+  }
+
+  #naicsLength,
+  #naicsInput,
+  #beaInput {
+    padding: 8px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 14px;
+  }
+
+  #naicsLength {
+    margin-bottom: 0;
+  }
+
+  #fetchButton {
+    padding: 8px 15px;
+    border: none;
+    border-radius: 4px;
+    background-color: #007bff;
+    color: white;
+    font-size: 14px;
+    cursor: pointer;
+  }
+
+  #fetchButton:hover {
+    background-color: #0056b3;
+  }
+
+  #mainTable {
+    margin-top: 20px;
+  }
+
+  #totalRowsDisplay {
+    margin-top: 10px;
+    font-weight: bold;
+  }
+
+  .bea-code {
+    cursor: pointer;
+  }
+  .sector-name {
+    color: blue;
+    cursor: pointer;
+  }
+  </style>
+</head>
+
+<body>
+
+  <div class="content contentpadding">
+    <div style="margin-bottom: 10px">
+      <a href="./">State Impact Reports</a>
+    </div>
+
+    <!-- Input Fields and Dropdown -->
+    <div class="input-container">
+      <div>
+        <div style="margin:7px 6px 0 0;float:left">
+          <label for="naicsLength">NAICS Length</label>
+        </div>
+        <select id="naicsLength">
+          <option value="">Show All</option>
+          <option value="2">2</option>
+          <option value="3">3</option>
+          <option value="4">4</option>
+          <option value="5" selected>5</option>
+          <option value="6">6</option>
+        </select>
+      </div>
+      <div>
+        <input type="text" id="naicsInput" placeholder="Enter NAICS Code">
+      </div>
+      <div>
+        <input type="text" id="beaInput" placeholder="Enter BEA Code">
+      </div>
+      <button id="fetchButton">Fetch</button>
+    </div>
+
+    <!-- Data Table -->
+    <div id="mainTable"></div>
+    <div id="totalRowsDisplay"></div> 
+    <div style="display: none;" class="local"><a href="#" id="showAllLink" style="display:block; margin: 10px 0 20px 0;">Show all rows</a></div><br>
+
+    The U.S. Bureau of Economic Analysis (BEA) uses the North American Industry Classification System (NAICS) to categorize industries into various sectors. BEA data is available at different levels of detail, including sector (21 industry groups), summary (71 industry groups), underlying summary (138 industry groups), and detail (402 industry groups).
+  </div>
+
+<script src="./config.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', async () => {
+  const naics = await useeio.NaicsMap.of(model);
+  const crosswalk = await model.sectorCrosswalk();
+
+  // Fetch all EPA sectors
+  async function getEpaSectors() {
+    const sectorsJsonFile = "/io/build/api/USEEIOv2.0.1-411/sectors.json";
+    try {
+      const response = await fetch(sectorsJsonFile);
+      const data = await response.json();
+      return data.filter(obj => obj.location !== "RoUS");
+    } catch (error) {
+      console.error("Error fetching EPA sectors:", error);
+      return [];
+    }
+  }
+
+  const epaSectors = await getEpaSectors();
+
+  // Function to find sector name by code
+  function findSectorName(code) {
+    const sector = epaSectors.find(s => s.code === code);
+    return sector ? sector.name : "Unknown";
+  }
+
+
+  // Function to load NAICS Titles from JSON based on length
+  // Load and merge NAICS titles from all relevant JSON files (2 to 6 digits)
+  async function loadAllNaicsTitles() {
+    const lengths = [2, 3, 4, 5, 6];
+    const basePath = "../../profile/trade/naics/";
+    const titleMap = {};
+
+    for (const len of lengths) {
+      try {
+        console.log("HERE");
+        console.log('${basePath}Naics len ${len}.json');
+        const response = await fetch(`${basePath}Naics Code Length ${len}.json`);
+        const data = await response.json();
+        data.forEach(entry => {
+          titleMap[entry.code] = entry.title;
+        });
+      } catch (error) {
+        console.warn(`Could not load NAICS titles for length ${len}:`, error);
+      }
+    }
+
+    return titleMap;
+  }
+
+  // Function to fetch and display NAICS data
+  async function fetchAndDisplayNaicsData(naicsCode = null, naicsLength = null, beaCode = null) {
+      try {
+          let tableData = [];
+
+          const naicsTitleMap = await loadAllNaicsTitles();
+
+          if (naicsCode) {
+              const data = await naics.toBea(naicsCode);
+              tableData = data.map(item => ({
+                  naicsCode: naicsCode,
+                  naicsTitle: naicsTitleMap[naicsCode] || "Unknown",
+                  BEA_detail: item,
+                  sectorName: findSectorName(item) || "NA",
+              }));
+          } else if (beaCode) {
+              const allNaicsCodes = crosswalk.mappings.map(entry => entry[0]);
+
+              for (const code of allNaicsCodes) {
+                  const data = await naics.toBea(code);
+
+                  const filteredData = data
+                      .filter(beaDetail => beaDetail === beaCode)
+                      .map(item => ({
+                          naicsCode: code,
+                          naicsTitle: naicsTitleMap[code] || "Unknown",
+                          BEA_detail: item,
+                          sectorName: findSectorName(item) || "NA",
+                      }));
+
+                  tableData = tableData.concat(filteredData);
+              }
+          } else {
+              const allNaicsCodes = crosswalk.mappings.map(entry => entry[0]);
+
+              for (const code of allNaicsCodes) {
+                  if (!naicsLength || (typeof code === "string" && code.length === parseInt(naicsLength, 10))) {
+                      const data = await naics.toBea(code);
+
+                      const codeData = data.map(item => ({
+                          naicsCode: code,
+                          naicsTitle: naicsTitleMap[code] || "Unknown",
+                          BEA_detail: item,
+                          sectorName: findSectorName(item) || "NA",
+                      }));
+
+                      tableData = tableData.concat(codeData);
+                  }
+              }
+          }
+
+          console.log("Total Rows Processed:", tableData.length);
+          
+          // TO DO - Activate these:
+
+          // Sort and store results
+          //const allResults = results.sort((a, b) => b.sortValue - a.sortValue);
+          //const sortedResults = allResults.slice(0, 20); // Changed from 10 to 20
+
+          setTimeout(() => {const table =
+              new Tabulator("#mainTable", {
+                  data: tableData,
+                  columns: [
+                      { title: "NAICS", field: "naicsCode", width:80 },
+                      { title: "NAICS Title", field: "naicsTitle" },
+                      { title: "BEA Sector", field: "sectorName",
+                      formatter: function (cell, formatterParams, onRendered) {
+                      const value = cell.getValue();
+                      const rowData = cell.getRow().getData();
+                      const uniqueId = `sector-name-${rowData.naicsCode}-${value}`;
+                      return `<span id="${uniqueId}" class="sector-name">${value}</span>`;
+                    },
+                    },
+                      { title: "BEA Detail",
+                       field: "BEA_detail" ,
+                       formatter: function (cell, formatterParams, onRendered) {
+                        // Add a unique ID to the BEA code cell
+                        const value = cell.getValue();
+                        const rowData = cell.getRow().getData();
+                        const uniqueId = `bea-code-${rowData.naicsCode}-${value}`; // Example ID format
+                        return `<span id="${uniqueId}" class="bea-code">${value}</span>`;
+                         },
+                         width:120
+                      },
+                  ],
+                  layout: "fitColumns",
+                  pagination: "local",
+                  paginationSize: 10,
+                  });
+
+                  document.getElementById("mainTable").addEventListener("click", function (e) {
+                    // Check if the clicked element has the class 'bea-code'
+                    if (e.target.classList.contains("bea-code")) {
+                    const beaCode = e.target.textContent; // Get the BEA code
+                    window.location.href = `sector_profile.html#demand=${beaCode}/US`; // Redirect with query parameter
+                  }
+                
+                  if (e.target.classList.contains("sector-name")) {
+                  const sectorName = e.target.textContent; // Get the sector name
+                  const row = e.target.closest(".tabulator-row"); // Get the row element
+                  const rowData = table.getRow(row).getData(); // Get the row data
+                  const beaCode = rowData.BEA_detail.split("#")[0]; // Extract the BEA code
+                  window.location.href = `sector_profile.html#demand=${beaCode}/US`; // Redirect with BEA code
+                }
+              });
+
+              document.getElementById("totalRowsDisplay").textContent = `Total NAICS Rows: ${tableData.length}`;
+          }, 100);
+      } catch (error) {
+          console.error("Error fetching data:", error);
+      }
+  }
+
+  // Display all NAICS data on page load with default 5-char filter
+  const defaultLength = document.getElementById('naicsLength').value || "5";
+  fetchAndDisplayNaicsData(null, defaultLength);
+
+  // Clear BEA Code when NAICS Code is being typed
+  document.getElementById("naicsInput").addEventListener("input", () => {
+    document.getElementById("beaInput").value = "";
+  });
+
+  // Clear NAICS Code when BEA Code is being typed
+  document.getElementById("beaInput").addEventListener("input", () => {
+    document.getElementById("naicsInput").value = "";
+  });
+
+  // Handle changes in NAICS length dropdown
+  document.getElementById("naicsLength").addEventListener("change", async (event) => {
+    const selectedLength = event.target.value;
+
+    // Clear the input fields when dropdown is changed
+    document.getElementById("naicsInput").value = "";
+    document.getElementById("beaInput").value = "";
+
+    await fetchAndDisplayNaicsData(null, selectedLength);
+  });
+
+  // Fetch data on button click
+  document.getElementById('fetchButton').addEventListener('click', async () => {
+    const inputCode = document.getElementById('naicsInput').value.trim();
+    const beaCode = document.getElementById('beaInput').value.trim();
+    const selectedLength = document.getElementById('naicsLength').value;
+    await fetchAndDisplayNaicsData(inputCode || null, selectedLength || null, beaCode || null);
+  });
+
+  // Update show all link handler
+  const showAllLink = document.getElementById('showAllLink');
+  showAllLink.addEventListener('click', function(e) {
+    e.preventDefault();
+    isShowingAllRows = true; // Set the state
+    mainTable.setData(allResults);
+    this.style.display = 'none';
+    
+    setTimeout(() => {
+      mainTable.scrollToRow(mainTable.getRows()[mainTable.getRows().length - 1], "bottom", true);
+    }, 100);
+  });
+
+  // Ensure link is visible initially unless showing all
+  showAllLink.style.display = isShowingAllRows ? 'none' : 'block';
+
+});
+</script>
+</body>
+
+</html>
+
