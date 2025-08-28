@@ -40,7 +40,7 @@ The 2020 state data resides in [ModelEarth/useeio-json on GitHub](https://github
 TO DO: Create interactive version of the supporting figures [including maps of the U.S.](https://doi.org/10.6084/m9.figshare.c.7041473) showing environmental pressure intensity grouped by indicator and commodity for all states and rankings of sectors by consumption by environmental pressure for 2020.
 
 <!--
-The JSON API that drives our [industry comparisons](/localsite/info/) uses EPA data prepared and presented using useeior (R Language),  [useeio.js](/useeio.js/footprint) and the [useeio-widgets](/io/charts/) (Javascript and HTML using the USEEIO-API).
+The JSON API that drives our [industry comparisons](/localsite/info/) uses EPA data prepared and presented using useeior (R Language),  [useeio.js](/trade/footprint) and the [useeio-widgets](/io/charts/) (Javascript and HTML using the USEEIO-API).
 -->
 
 ### State Models Report
