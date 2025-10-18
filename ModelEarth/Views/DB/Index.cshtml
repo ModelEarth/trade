@@ -1,0 +1,16 @@
+﻿@model List<(string schema, string table, string type)>
+
+<h2>Tables</h2>
+<table>
+    <thead><tr><th>Schema</th><th>Table</th><th>Rows</th></tr></thead>
+    <tbody>
+        @foreach (var (schema, table, rows) in Model)
+        {
+            <tr>
+                <td>@schema</td>
+                <td>@table</td>
+                <td>@rows</td>
+            </tr>
+        }
+    </tbody>
+</table>

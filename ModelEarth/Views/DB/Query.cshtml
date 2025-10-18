@@ -1,0 +1,252 @@
+﻿@model RunQueryVm
+@using System.Linq
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+
+
+<style>
+    /* ===== Pretty, accessible table styling ===== */
+    table[border="1"] {
+        width: 100%;
+        border-collapse: separate; /* lets us use rounded corners */
+        border-spacing: 0;
+        background: #fff;
+        border: 1px solid #E5E7EB; /* light gray */
+        border-radius: 12px;
+        overflow: hidden; /* clips rounded corners */
+        box-shadow: 0 1px 2px rgba(0,0,0,0.04), 0 8px 24px rgba(0,0,0,0.06);
+        font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
+        font-size: 14px;
+        line-height: 1.45;
+    }
+
+        /* Header */
+        table[border="1"] thead th {
+            position: relative;
+            padding: 12px 14px;
+            text-align: left;
+            font-weight: 600;
+            letter-spacing: 0.02em;
+            color: #111827; /* near-black */
+            background: linear-gradient(180deg, #F9FAFB, #F3F4F6); /* soft subtle gradient */
+            border-bottom: 1px solid #E5E7EB;
+            white-space: nowrap;
+        }
+
+            /* Header subtle divider between columns */
+            table[border="1"] thead th + th {
+                box-shadow: inset 1px 0 0 #E5E7EB;
+            }
+
+        /* Body cells */
+        table[border="1"] tbody td {
+            padding: 10px 14px;
+            color: #111827;
+            border-bottom: 1px solid #F3F4F6;
+            vertical-align: top;
+        }
+
+        /* Zebra striping */
+        table[border="1"] tbody tr:nth-child(odd) td {
+            background: #FCFCFD;
+        }
+
+        /* Row hover */
+        table[border="1"] tbody tr:hover td {
+            background: #EEF2FF; /* soft indigo tint */
+            transition: background 160ms ease;
+        }
+
+        /* Compact numbers align right automatically if you add `data-num` */
+        table[border="1"] td[data-num] {
+            text-align: right;
+            font-variant-numeric: tabular-nums;
+        }
+
+        /* Make long unbroken strings wrap nicely */
+        table[border="1"] td,
+        table[border="1"] th {
+            word-break: break-word;
+        }
+
+    /* Scroll on small screens while keeping rounded corners/shadows intact */
+    }
+
+    /* ===== Optional: polish basic form elements on the page ===== */
+    #queryForm label {
+        font-weight: 600;
+        color: #111827;
+    }
+
+    #queryForm input[type="text"],
+    #queryForm input[type="search"],
+    #queryForm input[type="url"],
+    #queryForm input[type="email"],
+    #queryForm input[type="password"] {
+        width: 100%;
+        max-width: 480px;
+        padding: 10px 12px;
+        border: 1px solid #E5E7EB;
+        border-radius: 10px;
+        background: #fff;
+        outline: none;
+        transition: box-shadow 160ms ease, border-color 160ms ease;
+    }
+
+    #queryForm input:focus {
+        border-color: #6366F1; /* indigo */
+        box-shadow: 0 0 0 3px rgba(99,102,241,0.15);
+    }
+
+    /* Monaco container border to match the theme */
+    #sqlEditor {
+        border: 1px solid #E5E7EB !important;
+        border-radius: 10px;
+        background: #fff;
+        box-shadow: inset 0 0 0 1px rgba(0,0,0,0.02);
+    }
+
+    /* Button */
+    #queryForm button[type="submit"] {
+        appearance: none;
+        border: none;
+        border-radius: 999px;
+        padding: 10px 16px;
+        font-weight: 600;
+        background: #4F46E5; /* indigo-600 */
+        color: white;
+        cursor: pointer;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.06), 0 6px 14px rgba(79,70,229,0.25);
+        transition: transform 120ms ease, box-shadow 160ms ease, background 160ms ease;
+    }
+
+        #queryForm button[type="submit"]:hover {
+            background: #4338CA; /* indigo-700 */
+            transform: translateY(-1px);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.10), 0 12px 24px rgba(79,70,229,0.30);
+        }
+
+        #queryForm button[type="submit"]:active {
+            transform: translateY(0);
+            box-shadow: 0 2px 6px rgba(0,0,0,0.08), 0 8px 18px rgba(79,70,229,0.24);
+        }
+
+</style>
+
+
+<h2>Query</h2>
+
+<form asp-action="Query" method="post" id="queryForm">
+    @* @Html.AntiForgeryToken() if you add [ValidateAntiForgeryToken] *@
+
+    <div style="margin-bottom: 12px;">
+        <label asp-for="ConnName">Connection name</label><br />
+        <input asp-for="ConnName" style="width: 420px;" />
+    </div>
+
+    <div style="margin-bottom: 8px;">
+        <label>SQL (SELECT only)</label>
+    </div>
+
+    <!-- Monaco mounts here -->
+    <div id="sqlEditor" style="height: 300px; border: 1px solid #ddd; border-radius: 6px;"></div>
+
+    <!-- Hidden field bound to your view model -->
+    <input asp-for="Query" type="hidden" id="Query" />
+
+    <div style="margin-top: 12px;">
+        <button type="submit">Run</button>
+    </div>
+</form>
+
+@if (!ViewData.ModelState.IsValid)
+{
+    <div style="color:crimson; margin-top: 10px;">
+        @foreach (var e in ViewData.ModelState.Values.SelectMany(v => v.Errors))
+        {
+            <div>@e.ErrorMessage</div>
+        }
+    </div>
+}
+
+@if (Model?.Result != null && Model.Result.Columns.Count > 0)
+{
+    <hr />
+    <table border="1" cellpadding="6" cellspacing="0">
+        <thead>
+            <tr>
+                @foreach (System.Data.DataColumn col in Model.Result.Columns)
+                {
+                    <th>@col.ColumnName</th>
+                }
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (System.Data.DataRow row in Model.Result.Rows)
+            {
+                <tr>
+                    @foreach (System.Data.DataColumn col in Model.Result.Columns)
+                    {
+                        <td>@(row[col] is DBNull ? "" : row[col])</td>
+                    }
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+<!-- Monaco Editor (CDN) -->
+<script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.51.0/min/vs/loader.js"></script>
+<script>
+    (function () {
+        // Safely pass the initial SQL from the model into JS
+        const initialSql = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model?.Query ?? ""));
+
+        // Configure AMD loader path
+        require.config({ paths: { 'vs': 'https://cdn.jsdelivr.net/npm/monaco-editor@0.51.0/min/vs' } });
+
+        require(['vs/editor/editor.main'], function () {
+            const editor = monaco.editor.create(document.getElementById('sqlEditor'), {
+                value: initialSql || "SELECT TOP 10 * FROM sys.tables;",
+                language: 'sql',
+                automaticLayout: true,
+                minimap: { enabled: false },
+                wordWrap: 'on',
+                scrollBeyondLastLine: false,
+                tabSize: 2
+            });
+
+            // Very lightweight SQL IntelliSense (keywords + snippets).
+            // You can extend this with table/column names from your server later.
+            const keywordSuggestions = [
+                'SELECT', 'FROM', 'WHERE', 'GROUP BY', 'ORDER BY', 'HAVING',
+                'JOIN', 'LEFT JOIN', 'RIGHT JOIN', 'INNER JOIN', 'OUTER JOIN',
+                'TOP', 'DISTINCT', 'COUNT', 'SUM', 'AVG', 'MIN', 'MAX',
+                'AND', 'OR', 'NOT', 'IN', 'IS NULL', 'IS NOT NULL',
+                'LIKE', 'BETWEEN', 'EXISTS', 'UNION', 'ALL', 'ASC', 'DESC'
+            ].map(k => ({
+                label: k,
+                kind: monaco.languages.CompletionItemKind.Keyword,
+                insertText: k + ' ',
+            }));
+
+            monaco.languages.registerCompletionItemProvider('sql', {
+                triggerCharacters: [' ', '.', '\n'],
+                provideCompletionItems: function (model, position) {
+                    return { suggestions: keywordSuggestions };
+                }
+            });
+
+            // On submit: copy editor value into the hidden input bound to Model.Query
+            const form = document.getElementById('queryForm');
+            form.addEventListener('submit', function () {
+                document.getElementById('Query').value = editor.getValue();
+            });
+
+            // Optional: resize observer for nicer layout in some containers
+            if ('ResizeObserver' in window) {
+                const ro = new ResizeObserver(() => editor.layout());
+                ro.observe(document.getElementById('sqlEditor'));
+            }
+        });
+    })();
+</script>

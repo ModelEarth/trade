@@ -1,0 +1,17 @@
+﻿@model List<ModelEarth.Models.DBConn>
+
+<h2>Saved Connections</h2>
+
+@if (Model == null || !Model.Any())
+{
+    <p>No connections found.</p>
+}
+else
+{
+    <ul>
+        @foreach (var conn in Model)
+        {
+            <li>@(string.IsNullOrWhiteSpace(conn.Name) ? "(no name)" : conn.Name)</li>
+        }
+    </ul>
+}

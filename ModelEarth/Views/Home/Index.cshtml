@@ -1,0 +1,36 @@
+﻿@model List<ModelEarth.Models.DBConn>
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+
+<h1>Database Dashboard</h1>
+
+<!-- Section A: Quick actions -->
+<div class="actions">
+    <a asp-action="CreateConnection" class="btn btn-primary">➕ Add New Connection</a>
+    <a asp-action="GetConnections" class="btn btn-secondary">🔌 Manage Connections</a>
+    <a asp-controller="DB" asp-action="Query" class="btn btn-success">📝 Run Query</a>
+    <a asp-controller="DB" asp-action="Monitor" class="btn btn-warning">📊 Monitor</a>
+</div>
+
+<hr />
+
+<!-- Section B: Saved connections summary -->
+@if (Model != null && Model.Any())
+{
+    <h3>Saved Connections (@Model.Count)</h3>
+    <ul>
+        @foreach (var conn in Model)
+        {
+            <li>@conn.Name</li>
+        }
+    </ul>
+}
+else
+{
+    <p>No connections saved yet.</p>
+}
+
+<hr />
+
+<!-- Section C: Future recent activity area -->
+<h3>Recent Activity</h3>
+<p>(Coming soon — query history, monitoring, etc.)</p>

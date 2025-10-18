@@ -1,0 +1,54 @@
+﻿@model ModelEarth.Models.DBConn
+@{
+    ViewData["Title"] = "Create Connection";
+}
+<h2>Create Database Connection</h2>
+
+<form asp-controller="DB" asp-action="CreateConnection" method="post" class="connection-form">
+    @Html.AntiForgeryToken()
+
+    <div>
+        <label asp-for="Name"></label>
+        <input asp-for="Name" required />
+        <span asp-validation-for="Name" class="text-danger"></span>
+    </div>
+
+    <div>
+        <label asp-for="Server"></label>
+        <input asp-for="Server" placeholder="modelearth-postgres-server.postgres.database.azure.com" required />
+        <span asp-validation-for="Server" class="text-danger"></span>
+    </div>
+
+    <div>
+        <label asp-for="Database"></label>
+        <input asp-for="Database" required />
+        <span asp-validation-for="Database" class="text-danger"></span>
+    </div>
+
+    <div>
+        <label asp-for="UserId">Username</label>
+        <input asp-for="UserId" required />
+        <span asp-validation-for="UserId" class="text-danger"></span>
+    </div>
+
+    <div>
+        <label asp-for="Password"></label>
+        <input asp-for="Password" type="password" required />
+        <span asp-validation-for="Password" class="text-danger"></span>
+    </div>
+
+    <div>
+        <label asp-for="Port"></label>
+        <input asp-for="Port" type="number" value="5432" />
+        <span asp-validation-for="Port" class="text-danger"></span>
+    </div>
+
+    <div>
+        <input asp-for="IntegratedSecurity" type="checkbox" />
+        <label asp-for="IntegratedSecurity">Use Integrated Security</label>
+    </div>
+
+    <button type="submit">Create Connection</button>
+</form>
+
+<link rel="stylesheet" href="~/css/create-connection.css" asp-append-version="true" />
