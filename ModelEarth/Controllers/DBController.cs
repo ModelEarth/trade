@@ -81,8 +81,7 @@ namespace ModelEarth.Controllers
         public IActionResult Query() => View(new RunQueryVm());
 
         [HttpPost]
-        [ValidateAntiForgeryToken]                 // ✅ add anti-forgery
-  
+        [ValidateAntiForgeryToken]
         public IActionResult Query(RunQueryVm vm)
         {
             if (string.IsNullOrWhiteSpace(vm.ConnName) || string.IsNullOrWhiteSpace(vm.Query))
@@ -91,6 +90,25 @@ namespace ModelEarth.Controllers
                 return View(vm);
             }
 
+            // 🧠 Trim and normalize SQL for checking
+            var sql = vm.Query.Trim();
+
+            // 🛑 Basic protection: only allow statements that start with SELECT
+            if (!sql.StartsWith("SELECT", StringComparison.OrdinalIgnoreCase))
+            {
+                ModelState.AddModelError("", "Only SELECT statements are allowed.");
+                return View(vm);
+            }
+
+            // Optional: forbid dangerous keywords anywhere in the query
+            var forbidden = new[] { "INSERT", "UPDATE", "DELETE", "DROP", "ALTER", "EXEC", "MERGE" };
+            if (forbidden.Any(k => sql.IndexOf(k, StringComparison.OrdinalIgnoreCase) >= 0))
+            {
+                ModelState.AddModelError("", "Only read-only SELECT queries are allowed.");
+                return View(vm);
+            }
+
+            // ✅ Run the query only if it's safe
             var dbConn = LoadConnectionFromCookieByName(vm.ConnName);
             if (dbConn is null)
             {
@@ -105,20 +123,19 @@ namespace ModelEarth.Controllers
                     : $"Server=tcp:{dbConn.Server},1433;Database={dbConn.Database};User ID={dbConn.UserId};Password={dbConn.Password};Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;";
 
                 using var cn = new Microsoft.Data.SqlClient.SqlConnection(cs);
-                using var cmd = new Microsoft.Data.SqlClient.SqlCommand(vm.Query, cn) { CommandTimeout = 30 };
+                using var cmd = new Microsoft.Data.SqlClient.SqlCommand(sql, cn) { CommandTimeout = 30 };
                 cn.Open();
                 using var rdr = cmd.ExecuteReader();
 
                 var dt = new System.Data.DataTable();
                 dt.Load(rdr);
-
-                vm.Result = dt;           // <— put result into the view model
-                return View(vm);          // <— return RunQueryVm, not DataTable
+                vm.Result = dt;
+                return View(vm);
             }
             catch (Exception ex)
             {
                 ModelState.AddModelError("", $"Query failed: {ex.GetBaseException().Message}");
-                return View(vm);          // keep user inputs + errors
+                return View(vm);
             }
         }
 
