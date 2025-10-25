@@ -5,8 +5,8 @@
 
 <!-- Section A: Quick actions -->
 <div class="actions">
-    <a asp-action="CreateConnection" class="btn btn-primary">➕ Add New Connection</a>
-    <a asp-action="GetConnections" class="btn btn-secondary">🔌 Manage Connections</a>
+    <a asp-controller="DB" asp-action="CreateConnection" class="btn btn-primary">➕ Add New Connection</a>
+    <a asp-controller="DB" asp-action="GetConnections" class="btn btn-secondary">🔌 Manage Connections</a>
     <a asp-controller="DB" asp-action="Query" class="btn btn-success">📝 Run Query</a>
     <a asp-controller="DB" asp-action="Monitor" class="btn btn-warning">📊 Monitor</a>
 </div>

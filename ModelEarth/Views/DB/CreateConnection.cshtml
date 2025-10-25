@@ -1,48 +1,67 @@
 ﻿@model ModelEarth.Models.DBConn
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
 @{
     ViewData["Title"] = "Create Connection";
 }
+
 <h2>Create Database Connection</h2>
 
 <form asp-controller="DB" asp-action="CreateConnection" method="post" class="connection-form">
     @Html.AntiForgeryToken()
 
+    <!-- Provider -->
+    <div>
+        <label asp-for="Provider">Database Type</label>
+        <select asp-for="Provider" id="provider">
+            <option value="SqlServer">SQL Server</option>
+            <option value="Postgres">PostgreSQL</option>
+        </select>
+        <span asp-validation-for="Provider" class="text-danger"></span>
+    </div>
+
+    <!-- Name -->
     <div>
         <label asp-for="Name"></label>
         <input asp-for="Name" required />
         <span asp-validation-for="Name" class="text-danger"></span>
     </div>
 
+    <!-- Server -->
     <div>
         <label asp-for="Server"></label>
         <input asp-for="Server" placeholder="modelearth-postgres-server.postgres.database.azure.com" required />
         <span asp-validation-for="Server" class="text-danger"></span>
     </div>
 
+    <!-- Database -->
     <div>
         <label asp-for="Database"></label>
         <input asp-for="Database" required />
         <span asp-validation-for="Database" class="text-danger"></span>
     </div>
 
+    <!-- Username -->
     <div>
         <label asp-for="UserId">Username</label>
         <input asp-for="UserId" required />
         <span asp-validation-for="UserId" class="text-danger"></span>
     </div>
 
+    <!-- Password -->
     <div>
         <label asp-for="Password"></label>
         <input asp-for="Password" type="password" required />
         <span asp-validation-for="Password" class="text-danger"></span>
     </div>
 
+    <!-- Port -->
     <div>
         <label asp-for="Port"></label>
-        <input asp-for="Port" type="number" value="5432" />
+        <input asp-for="Port" id="Port" type="number" value="5432" />
         <span asp-validation-for="Port" class="text-danger"></span>
     </div>
 
+    <!-- Integrated Security -->
     <div>
         <input asp-for="IntegratedSecurity" type="checkbox" />
         <label asp-for="IntegratedSecurity">Use Integrated Security</label>
@@ -52,3 +71,18 @@
 </form>
 
 <link rel="stylesheet" href="~/css/create-connection.css" asp-append-version="true" />
+
+@section Scripts {
+    <script>
+        const providerSel = document.getElementById('provider');
+        const portInput = document.getElementById('Port');
+
+        providerSel.addEventListener('change', () => {
+            if (providerSel.value === 'Postgres' && (!portInput.value || portInput.value === '1433')) {
+                portInput.value = '5432';
+            } else if (providerSel.value === 'SqlServer' && (!portInput.value || portInput.value === '5432')) {
+                portInput.value = '1433';
+            }
+        });
+    </script>
+}
