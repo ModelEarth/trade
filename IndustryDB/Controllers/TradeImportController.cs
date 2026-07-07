@@ -239,8 +239,8 @@ namespace IndustryDB.Controllers
                         Industry1 = r.Industry1,
                         Industry2 = r.Industry2,
                         Amount = r.Amount,
-                        TradeflowType = tradeflowType,
-                        SourceFile = $"{year}/{country}/{tradeflowType}/{Path.GetFileName(csvFile)}"
+                        FlowType = tradeflowType,
+                        Country = country
                     }).ToList();
 
                     // Bulk insert into database

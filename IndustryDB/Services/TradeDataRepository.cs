@@ -83,57 +83,57 @@ namespace IndustryDB.Services
             {
                 "public.trade" => @"
                     INSERT INTO public.trade
-                    (year, region1, region2, industry1, industry2, amount, tradeflow_type, source_file)
+                    (trade_id, year, region1, region2, industry1, industry2, amount, flow_type, country)
                     VALUES
-                    (@Year, @Region1, @Region2, @Industry1, @Industry2, @Amount, @TradeflowType, @SourceFile)",
+                    (@TradeId, @Year, @Region1, @Region2, @Industry1, @Industry2, @Amount, @FlowType, @Country)",
 
                 "public.trade_employment" => @"
                     INSERT INTO public.trade_employment
-                    (year, region1, region2, industry1, industry2, employment_value, tradeflow_type, source_file)
+                    (trade_id, year, region1, region2, industry1, industry2, employment_value, flow_type, country)
                     VALUES
-                    (@Year, @Region1, @Region2, @Industry1, @Industry2, @Amount, @TradeflowType, @SourceFile)",
+                    (@TradeId, @Year, @Region1, @Region2, @Industry1, @Industry2, @Amount, @FlowType, @Country)",
 
                 "public.trade_factor" => @"
                     INSERT INTO public.trade_factor
-                    (year, region1, region2, industry1, industry2, factor_value, tradeflow_type, source_file)
+                    (trade_id, year, country, flow_type, factor_id, coefficient, level)
                     VALUES
-                    (@Year, @Region1, @Region2, @Industry1, @Industry2, @Amount, @TradeflowType, @SourceFile)",
+                    (@TradeId, @Year, @Country, @FlowType, @FactorId, @Coefficient, @Level)",
 
                 "public.trade_impact" => @"
                     INSERT INTO public.trade_impact
-                    (year, region1, region2, industry1, industry2, level, tradeflow_type, source_file)
+                    (trade_id, year, region1, region2, industry1, industry2, level, flow_type, country)
                     VALUES
-                    (@Year, @Region1, @Region2, @Industry1, @Industry2, @Amount, @TradeflowType, @SourceFile)",
+                    (@TradeId, @Year, @Region1, @Region2, @Industry1, @Industry2, @Amount, @FlowType, @Country)",
 
                 "public.trade_material" => @"
                     INSERT INTO public.trade_material
-                    (year, region1, region2, industry1, industry2, material_value, tradeflow_type, source_file)
+                    (trade_id, year, region1, region2, industry1, industry2, material_value, flow_type, country)
                     VALUES
-                    (@Year, @Region1, @Region2, @Industry1, @Industry2, @Amount, @TradeflowType, @SourceFile)",
+                    (@TradeId, @Year, @Region1, @Region2, @Industry1, @Industry2, @Amount, @FlowType, @Country)",
 
                 "public.trade_resource" => @"
                     INSERT INTO public.trade_resource
-                    (year, region1, region2, industry1, industry2, resource_value, tradeflow_type, source_file)
+                    (trade_id, year, region1, region2, industry1, industry2, resource_value, flow_type, country)
                     VALUES
-                    (@Year, @Region1, @Region2, @Industry1, @Industry2, @Amount, @TradeflowType, @SourceFile)",
+                    (@TradeId, @Year, @Region1, @Region2, @Industry1, @Industry2, @Amount, @FlowType, @Country)",
 
                 "public.bea_table1" => @"
                     INSERT INTO public.bea_table1
-                    (year, region1, region2, industry1, industry2, bea_value, tradeflow_type, source_file)
+                    (trade_id, year, region1, region2, industry1, industry2, bea_value, flow_type, country)
                     VALUES
-                    (@Year, @Region1, @Region2, @Industry1, @Industry2, @Amount, @TradeflowType, @SourceFile)",
+                    (@TradeId, @Year, @Region1, @Region2, @Industry1, @Industry2, @Amount, @FlowType, @Country)",
 
                 "public.bea_table2" => @"
                     INSERT INTO public.bea_table2
-                    (year, region1, region2, industry1, industry2, bea_value, tradeflow_type, source_file)
+                    (trade_id, year, region1, region2, industry1, industry2, bea_value, flow_type, country)
                     VALUES
-                    (@Year, @Region1, @Region2, @Industry1, @Industry2, @Amount, @TradeflowType, @SourceFile)",
+                    (@TradeId, @Year, @Region1, @Region2, @Industry1, @Industry2, @Amount, @FlowType, @Country)",
 
                 "public.bea_table3" => @"
                     INSERT INTO public.bea_table3
-                    (year, region1, region2, industry1, industry2, bea_value, tradeflow_type, source_file)
+                    (trade_id, year, region1, region2, industry1, industry2, bea_value, flow_type, country)
                     VALUES
-                    (@Year, @Region1, @Region2, @Industry1, @Industry2, @Amount, @TradeflowType, @SourceFile)",
+                    (@TradeId, @Year, @Region1, @Region2, @Industry1, @Industry2, @Amount, @FlowType, @Country)",
 
                 _ => throw new ArgumentException($"Unknown table name: {tableName}")
             };
@@ -238,7 +238,7 @@ namespace IndustryDB.Services
     public class ImportStatistics
     {
         public string region1 { get; set; } = "";
-        public string tradeflow_type { get; set; } = "";
+        public string flow_type { get; set; } = "";
         public long trade_count { get; set; }
         public long employment_count { get; set; }
         public long factor_count { get; set; }
