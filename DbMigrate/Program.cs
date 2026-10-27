@@ -5,9 +5,15 @@ using Npgsql;
 
 Console.WriteLine("🔧 Running database migrations...\n");
 
-// Load .env from the IndustryDB webroot (same convention as the web app)
+// Load settings from the webroot's env file (automation/paths.yaml env_file:),
+// as the web app does, or else from .env in the IndustryDB webroot
+var webrootEnv = IndustryDB.Services.WebrootEnv.Load();
 var envPath = Path.Combine(AppContext.BaseDirectory, "..", "..", "IndustryDB", "wwwroot", ".env");
-if (File.Exists(envPath))
+if (webrootEnv != null)
+{
+    Console.WriteLine($"✅ Loaded settings from {webrootEnv} (automation/paths.yaml)\n");
+}
+else if (File.Exists(envPath))
 {
     DotEnv.Load(options: new DotEnvOptions(envFilePaths: new[] { envPath }));
     Console.WriteLine($"✅ Loaded .env from {Path.GetFullPath(envPath)}\n");

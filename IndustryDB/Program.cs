@@ -1,11 +1,15 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using IndustryDB.Data;
-// Load .env file for environment variables
-dotenv.net.DotEnv.Load(options: new dotenv.net.DotEnvOptions(
-    envFilePaths: new[] { "../.env", ".env" },
-    ignoreExceptions: true
-));
+// Load settings from the webroot's env file (automation/paths.yaml env_file:),
+// or from a local .env when trade runs outside a webroot
+if (IndustryDB.Services.WebrootEnv.Load() == null)
+{
+    dotenv.net.DotEnv.Load(options: new dotenv.net.DotEnvOptions(
+        envFilePaths: new[] { "../.env", ".env" },
+        ignoreExceptions: true
+    ));
+}
 
 var builder = WebApplication.CreateBuilder(args);
 var connectionString = builder.Configuration.GetConnectionString("IndustryDBContextConnection") ?? throw new InvalidOperationException("Connection string 'IndustryDBContextConnection' not found.");

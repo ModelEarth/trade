@@ -21,6 +21,11 @@ git clone https://github.com/modelearth/trade.git
 cd trade
 ```
 
+Inside a webroot such as CloudRoot, skip steps 2 and 3: the apps read the env
+file named by `env_file:` in the webroot's `automation/paths.yaml`, using its
+`EXIOBASE_*` values for the database and its `TRADE_DATA_REPO_PATH`
+(see `IndustryDB/Services/WebrootEnv.cs`).
+
 2. **Create .env file**
 ```bash
 cp .env.example .env
