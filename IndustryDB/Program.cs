@@ -2,13 +2,10 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using IndustryDB.Data;
 // Load settings from the webroot's env file (automation/paths.yaml env_file:),
-// or from a local .env when trade runs outside a webroot
+// or from .env in the trade repo's root when trade runs outside a webroot
 if (IndustryDB.Services.WebrootEnv.Load() == null)
 {
-    dotenv.net.DotEnv.Load(options: new dotenv.net.DotEnvOptions(
-        envFilePaths: new[] { "../.env", ".env" },
-        ignoreExceptions: true
-    ));
+    IndustryDB.Services.WebrootEnv.LoadRepoEnv();
 }
 
 var builder = WebApplication.CreateBuilder(args);

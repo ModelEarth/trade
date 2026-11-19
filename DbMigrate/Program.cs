@@ -1,26 +1,22 @@
 using System;
 using System.IO;
-using dotenv.net;
 using Npgsql;
 
 Console.WriteLine("🔧 Running database migrations...\n");
 
 // Load settings from the webroot's env file (automation/paths.yaml env_file:),
-// as the web app does, or else from .env in the IndustryDB webroot
-var webrootEnv = IndustryDB.Services.WebrootEnv.Load();
-var envPath = Path.Combine(AppContext.BaseDirectory, "..", "..", "IndustryDB", "wwwroot", ".env");
-if (webrootEnv != null)
+// as the web app does, or else from .env in the trade repo's root
+if (IndustryDB.Services.WebrootEnv.Load() != null)
 {
-    Console.WriteLine($"✅ Loaded settings from {webrootEnv} (automation/paths.yaml)\n");
+    Console.WriteLine("✅ Loaded settings from the env file named in automation/paths.yaml\n");
 }
-else if (File.Exists(envPath))
+else if (IndustryDB.Services.WebrootEnv.LoadRepoEnv())
 {
-    DotEnv.Load(options: new DotEnvOptions(envFilePaths: new[] { envPath }));
-    Console.WriteLine($"✅ Loaded .env from {Path.GetFullPath(envPath)}\n");
+    Console.WriteLine("✅ Loaded the trade repo's .env file\n");
 }
 else
 {
-    Console.WriteLine($"⚠️  No .env found at {Path.GetFullPath(envPath)} — falling back to environment variables\n");
+    Console.WriteLine("⚠️  No env file found, using environment variables\n");
 }
 
 var host     = Environment.GetEnvironmentVariable("DATABASE_HOST")     ?? "localhost";

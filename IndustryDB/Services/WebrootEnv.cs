@@ -49,6 +49,34 @@ namespace IndustryDB.Services
             return envFile;
         }
 
+        /// <summary>
+        /// The fallback when Load() finds no webroot env file, as when trade is cloned on its own:
+        /// loads .env from the trade repo's root (the folder with IndustryDB.sln), found by looking
+        /// upward from the app's folder, so it doesn't depend on where the app is started.
+        /// Returns false when there's no such file (then settings come from environment variables).
+        /// </summary>
+        public static bool LoadRepoEnv()
+        {
+            foreach (var start in new[] { AppContext.BaseDirectory, Directory.GetCurrentDirectory() })
+            {
+                for (var dir = new DirectoryInfo(start); dir != null; dir = dir.Parent)
+                {
+                    if (!File.Exists(Path.Combine(dir.FullName, "IndustryDB.sln")))
+                    {
+                        continue;
+                    }
+                    var envFile = Path.Combine(dir.FullName, ".env");
+                    if (!File.Exists(envFile))
+                    {
+                        return false;
+                    }
+                    DotEnv.Load(options: new DotEnvOptions(envFilePaths: new[] { envFile }, overwriteExistingVars: false));
+                    return true;
+                }
+            }
+            return false;
+        }
+
         private static void SetIfMissing(string key, string? value)
         {
             if (!string.IsNullOrEmpty(value) && string.IsNullOrEmpty(Environment.GetEnvironmentVariable(key)))
